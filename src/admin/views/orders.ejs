@@ -1,0 +1,39 @@
+<%- include('partials/header') %>
+<%- include('partials/page-tools') %>
+<% const badge = { pending: 'secondary', confirmed: 'info', completed: 'success', cancelled: 'danger', refunded: 'dark', partially_refunded: 'warning' }; %>
+<form class="row g-2 mb-3" method="get" action="/admin/orders">
+  <div class="col-md-3"><input class="form-control" name="q" value="<%= f.q %>" placeholder="Order no., buyer name or email"></div>
+  <div class="col-md-2">
+    <select class="form-select" name="status" aria-label="Status">
+      <option value="">Any status</option>
+      <% statuses.forEach(s => { %><option value="<%= s %>" <%= f.status === s ? 'selected' : '' %>><%= s.replace('_', ' ') %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-2"><input class="form-control" type="date" name="from" value="<%= f.from %>" aria-label="From date"></div>
+  <div class="col-md-2"><input class="form-control" type="date" name="to" value="<%= f.to %>" aria-label="To date"></div>
+  <div class="col-auto"><button class="btn btn-success">Filter</button> <a class="btn btn-outline-secondary" href="/admin/orders">Clear</a></div>
+</form>
+
+<div class="card"><div class="card-body">
+<% if (!rows.length) { %><p class="text-muted mb-0">No orders match.</p><% } else { %>
+<div class="table-responsive"><table class="table align-middle mb-0">
+  <thead><tr><th>Order</th><th>Buyer</th><th>Date</th><th class="text-end">Total</th><th>Sellers</th><th>Payment</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  <% rows.forEach(o => { %>
+    <tr>
+      <td>#<%= o.order_id %></td>
+      <td><%= o.buyer %><div class="text-muted small"><%= o.buyer_email %></div></td>
+      <td><%= fmtDate(o.ordered_at) %></td>
+      <td class="text-end"><%= money(o.total_amount_minor, o.currency) %></td>
+      <td><%= o.sellers %></td>
+      <td><%= o.payment_status || 'none' %></td>
+      <td><span class="badge text-bg-<%= badge[o.order_status] || 'secondary' %>"><%= o.order_status.replace('_', ' ') %></span></td>
+      <td class="text-end"><a class="btn btn-outline-secondary btn-sm" href="/admin/orders/<%= o.order_id %>">Manage</a></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table></div>
+<% } %>
+<%- include('partials/pager') %>
+</div></div>
+<%- include('partials/footer') %>

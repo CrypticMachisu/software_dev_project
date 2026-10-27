@@ -1,0 +1,8 @@
+<%# Expects `pager` from pagerOf(). Shows "N rows · page X of Y" with Previous / Next. %>
+<div class="d-flex justify-content-between align-items-center mt-3">
+  <span class="text-muted small"><%= pager.total %> <%= locals.noun || 'rows' %> · page <%= pager.page %> of <%= pager.pages %></span>
+  <div class="btn-group">
+    <% if (pager.page > 1) { %><a class="btn btn-outline-secondary btn-sm" href="<%= pager.href(pager.page - 1) %>">Previous</a><% } else { %><span class="btn btn-outline-secondary btn-sm disabled">Previous</span><% } %>
+    <% if (pager.page < pager.pages) { %><a class="btn btn-outline-secondary btn-sm" href="<%= pager.href(pager.page + 1) %>">Next</a><% } else { %><span class="btn btn-outline-secondary btn-sm disabled">Next</span><% } %>
+  </div>
+</div>

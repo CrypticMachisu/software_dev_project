@@ -1,0 +1,41 @@
+<%- include('partials/header') %>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small">Users</div><div class="stat-value"><%= stats.users %></div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small">Approved sellers</div><div class="stat-value"><%= stats.sellers %></div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small">Orders</div><div class="stat-value"><%= stats.orders %></div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card"><div class="card-body"><div class="text-muted small">Revenue</div><div class="stat-value"><%= money(stats.revenue_minor) %></div></div></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-6"><div class="card"><div class="card-body">
+    <h2 class="h6">Pending seller approvals</h2>
+    <% if (!pending.length) { %><p class="text-muted mb-0">No sellers waiting for approval.</p><% } else { %>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Seller</th><th>Email</th><th>Since</th></tr></thead>
+      <tbody><% pending.forEach(p => { %><tr><td><a href="/admin/users/<%= p.user_id %>"><%= p.name %></a></td><td><%= p.email %></td><td><%= fmtDate(p.assigned_at) %></td></tr><% }) %></tbody>
+    </table></div><% } %>
+  </div></div></div>
+
+  <div class="col-lg-6"><div class="card"><div class="card-body">
+    <h2 class="h6">Recent orders</h2>
+    <% if (!recent.length) { %><p class="text-muted mb-0">No orders yet.</p><% } else { %>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Order</th><th>Buyer</th><th>Total</th><th>Status</th></tr></thead>
+      <tbody><% recent.forEach(o => { %><tr>
+        <td>#<%= o.order_id %></td><td><%= o.buyer %></td>
+        <td><%= money(o.total_amount_minor, o.currency) %></td>
+        <td><span class="badge text-bg-secondary"><%= o.fulfillment_status %></span></td>
+      </tr><% }) %></tbody>
+    </table></div><% } %>
+  </div></div></div>
+</div>
+
+<div class="card"><div class="card-body">
+  <h2 class="h6">Low stock</h2>
+  <% if (!lowStock.length) { %><p class="text-muted mb-0">No active products are running low.</p><% } else { %>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Product</th><th>Seller</th><th>Left</th></tr></thead>
+    <tbody><% lowStock.forEach(p => { %><tr><td><%= p.title %></td><td><%= p.seller %></td><td><span class="badge text-bg-warning"><%= p.quantity_available %></span></td></tr><% }) %></tbody>
+  </table></div><% } %>
+</div></div>
+<%- include('partials/footer') %>

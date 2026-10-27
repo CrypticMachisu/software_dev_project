@@ -1,0 +1,39 @@
+<%- include('partials/header') %>
+<%- include('partials/page-tools') %>
+<a class="btn btn-link px-0 mb-2" href="/admin/products">&larr; Back to products</a>
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Add category</h2>
+  <form class="row g-2" method="post" action="/admin/products/categories">
+    <div class="col-md-4"><input class="form-control" name="name" maxlength="120" placeholder="Name" required></div>
+    <div class="col-md-6"><input class="form-control" name="description" maxlength="1000" placeholder="Description (optional)"></div>
+    <div class="col-md-2"><button class="btn btn-success w-100">Add</button></div>
+  </form>
+</div></div>
+
+<div class="card"><div class="card-body">
+<% if (!categories.length) { %><p class="text-muted mb-0">No categories yet.</p><% } else { %>
+<div class="table-responsive"><table class="table align-middle mb-0">
+  <thead><tr><th>Name</th><th>Description</th><th class="text-end">Products</th><th></th></tr></thead>
+  <tbody>
+  <% categories.forEach(c => { %>
+    <tr>
+      <td colspan="2">
+        <form id="edit-<%= c.category_id %>" class="row g-2" method="post" action="/admin/products/categories/<%= c.category_id %>/edit">
+          <div class="col-md-5"><input class="form-control form-control-sm" name="name" maxlength="120" value="<%= c.name %>" required aria-label="Name"></div>
+          <div class="col-md-7"><input class="form-control form-control-sm" name="description" maxlength="1000" value="<%= c.description || '' %>" aria-label="Description"></div>
+        </form>
+      </td>
+      <td class="text-end"><%= c.products %></td>
+      <td class="text-end text-nowrap">
+        <button class="btn btn-outline-success btn-sm" form="edit-<%= c.category_id %>">Save</button>
+        <form class="d-inline" method="post" action="/admin/products/categories/<%= c.category_id %>/delete" data-confirm="Delete the category '<%= c.name %>'?">
+          <button class="btn btn-outline-danger btn-sm">Delete</button>
+        </form>
+      </td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table></div>
+<% } %>
+</div></div>
+<%- include('partials/footer') %>

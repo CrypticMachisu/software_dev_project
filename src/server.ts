@@ -1,4 +1,5 @@
 import http from "node:http";
+import { adminApp } from "./admin/app.js";
 import { pool } from "./db.js";
 import { env } from "./env.js";
 
@@ -6,6 +7,12 @@ const port = Number(process.env.PORT ?? 3000);
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+
+  // Admin panel: every /admin request is handled by the Express app in src/admin/app.ts
+  if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
+    adminApp(req, res);
+    return;
+  }
 
   if (req.method === "GET" && url.pathname === "/health") {
     try {

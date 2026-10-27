@@ -1,0 +1,17 @@
+body { background: #f4f7f5; color: #1c1f1e; }
+.admin-shell { min-height: 100vh; }
+.admin-sidebar { width: 230px; flex: none; background: #17221f; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; }
+.admin-sidebar .brand { color: #fff; font-size: 20px; font-weight: 700; padding: 4px 14px 18px; }
+.admin-sidebar .brand small { display: block; font-size: 12px; font-weight: 400; color: #b7c4bf; }
+.nav-item-link { display: block; padding: 11px 14px; border-radius: 6px; font-size: 14px; color: #e8eeeb; text-decoration: none; }
+.nav-item-link i { width: 22px; }
+.nav-item-link:hover { background: #22332e; color: #fff; }
+.nav-item-link.active { background: #2a4a41; font-weight: 600; color: #fff; }
+.nav-item-link.disabled { opacity: .45; cursor: not-allowed; }
+.signed-in { margin-top: auto; padding: 14px; font-size: 12px; color: #b7c4bf; }
+.admin-main { padding: 28px 32px; min-width: 0; }
+.stat-card .stat-value { font-size: 28px; font-weight: 700; }
+.login-page { background: #e9f0ec; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.login-card { background: #fff; border: 1px solid #dde4e0; border-radius: 10px; padding: 32px; width: 380px; max-width: 92%; }
+.login-brand { font-size: 24px; font-weight: 700; color: #0f6e56; }
+@media (max-width: 768px) { .admin-sidebar { display: none; } .admin-main { padding: 16px; } }

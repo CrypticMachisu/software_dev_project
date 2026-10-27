@@ -1,0 +1,59 @@
+<%- include('partials/header') %>
+<%- include('partials/page-tools') %>
+<% const badge = { pending: 'secondary', confirmed: 'info', processing: 'info', shipped: 'primary', delivered: 'primary', completed: 'success', cancelled: 'danger', returned: 'warning', refunded: 'dark', partially_refunded: 'warning' }; %>
+<a class="btn btn-link px-0 mb-2" href="/admin/orders">&larr; Back to orders</a>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6"><div class="card h-100"><div class="card-body">
+    <h2 class="h6">Order</h2>
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><span class="badge text-bg-<%= badge[order.order_status] || 'secondary' %>"><%= order.order_status.replace('_', ' ') %></span></dd>
+      <dt class="col-sm-4">Placed</dt><dd class="col-sm-8"><%= fmtDate(order.ordered_at) %></dd>
+      <dt class="col-sm-4">Total</dt><dd class="col-sm-8"><%= money(order.total_amount_minor, order.currency) %></dd>
+    </dl>
+  </div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-body">
+    <h2 class="h6">Buyer</h2>
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Name</dt><dd class="col-sm-8"><%= order.buyer %></dd>
+      <dt class="col-sm-4">Email</dt><dd class="col-sm-8"><%= order.buyer_email %></dd>
+      <dt class="col-sm-4">Phone</dt><dd class="col-sm-8"><%= order.buyer_phone || '-' %></dd>
+    </dl>
+  </div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Payments</h2>
+  <% if (!payments.length) { %><p class="text-muted mb-0">No payment has been started for this order.</p><% } else { %>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Provider</th><th>Status</th><th class="text-end">Amount</th><th>Created</th></tr></thead>
+    <tbody><% payments.forEach(p => { %><tr><td><%= p.provider %></td><td><%= p.status.replace('_', ' ') %></td><td class="text-end"><%= money(p.amount_minor, p.currency) %></td><td><%= fmtDate(p.created_at) %></td></tr><% }) %></tbody>
+  </table></div><% } %>
+</div></div>
+
+<h2 class="h6">Seller orders</h2>
+<% sellerOrders.forEach(so => { %>
+<div class="card mb-3"><div class="card-body">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+    <div>
+      <strong><%= so.seller %></strong>
+      <span class="text-muted small ms-2">Handoff: <%= so.exchange_method %> &middot; Release: <%= String(so.release_status).replace('_', ' ') %></span>
+    </div>
+    <span class="badge text-bg-<%= badge[so.fulfillment_status] || 'secondary' %>"><%= so.fulfillment_status %></span>
+  </div>
+  <div class="table-responsive"><table class="table table-sm align-middle">
+    <thead><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit price</th><th class="text-end">Line total</th></tr></thead>
+    <tbody><% so.items.forEach(i => { %><tr><td><%= i.title %></td><td class="text-end"><%= i.quantity %></td><td class="text-end"><%= money(i.unit_price_minor, order.currency) %></td><td class="text-end"><%= money(i.line_total_minor, order.currency) %></td></tr><% }) %></tbody>
+  </table></div>
+  <% if (so.next.length) { %>
+  <form class="row g-2 align-items-center" method="post" action="/admin/orders/seller-orders/<%= so.seller_order_id %>/status" data-confirm="Update this seller order's status?">
+    <div class="col-auto"><label class="col-form-label" for="s<%= so.seller_order_id %>">Move to</label></div>
+    <div class="col-auto">
+      <select class="form-select form-select-sm" id="s<%= so.seller_order_id %>" name="status"><% so.next.forEach(n => { %><option value="<%= n %>"><%= n %></option><% }) %></select>
+    </div>
+    <div class="col-auto"><button class="btn btn-success btn-sm">Update status</button></div>
+  </form>
+  <% } else { %><p class="text-muted small mb-0">This seller order is final ("<%= so.fulfillment_status %>") and cannot be changed.</p><% } %>
+</div></div>
+<% }) %>
+<%- include('partials/footer') %>

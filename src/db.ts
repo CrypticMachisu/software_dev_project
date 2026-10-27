@@ -1,19 +1,13 @@
-import pg from "pg";
+﻿import pg from "pg";
 import { env } from "./env.js";
 
 const { Pool, Client } = pg;
+const ssl = env.postgres.ssl ? { rejectUnauthorized: true } : false;
 
-/** Application traffic: pooled Neon URL (PgBouncer). */
-export const pool = new Pool({
-  connectionString: env.postgres.databaseUrl,
-  max: 10,
-  ssl: { rejectUnauthorized: true },
-});
+/** Application traffic. */
+export const pool = new Pool({ connectionString: env.postgres.databaseUrl, max: 10, ssl });
 
-/** Schema / session work: direct unpooled URL. */
+/** Schema / migration work. */
 export function unpooledClient(): pg.Client {
-  return new Client({
-    connectionString: env.postgres.databaseUrlUnpooled,
-    ssl: { rejectUnauthorized: true },
-  });
+  return new Client({ connectionString: env.postgres.databaseUrlUnpooled, ssl });
 }

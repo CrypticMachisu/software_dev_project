@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= locals.title || 'Admin' %> · M-DUKA Admin</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="/admin/static/css/admin.css" rel="stylesheet">
+</head>
+<body>
+<% const nav = [
+  { key: 'dashboard', label: 'Dashboard',        href: '/admin',          icon: 'gauge-high',     ready: true  },
+  { key: 'users',     label: 'Users',            href: '/admin/users',    icon: 'users',          ready: true  },
+  { key: 'sellers',   label: 'Seller approvals', href: '/admin/users?approval=pending', icon: 'user-check', ready: true  },
+  { key: 'products',  label: 'Products',         href: '/admin/products', icon: 'box',            ready: true  },
+  { key: 'orders',    label: 'Orders',           href: '/admin/orders',   icon: 'receipt',        ready: true  },
+  { key: 'exchange',  label: 'Exchange methods', href: '/admin/exchange', icon: 'truck',          ready: true,  superOnly: true },
+  { key: 'reports',   label: 'Reports',          href: '/admin/reports',  icon: 'chart-line',     ready: false },
+  { key: 'audit',     label: 'Audit logs',       href: '/admin/audit',    icon: 'clipboard-list', ready: true,  superOnly: true },
+  { key: 'settings',  label: 'Settings',         href: '/admin/settings', icon: 'gear',           ready: false, superOnly: true }
+]; %>
+<div class="admin-shell d-flex">
+  <nav class="admin-sidebar">
+    <div class="brand">M-DUKA<small>Admin panel</small></div>
+    <% nav.forEach(n => { if (n.superOnly && !isSuper) return; %>
+      <% if (n.ready) { %>
+        <a class="nav-item-link <%= active === n.key ? 'active' : '' %>" href="<%= n.href %>"><i class="fa-solid fa-<%= n.icon %>"></i> <%= n.label %></a>
+      <% } else { %>
+        <span class="nav-item-link disabled"><i class="fa-solid fa-<%= n.icon %>"></i> <%= n.label %></span>
+      <% } %>
+    <% }) %>
+    <div class="signed-in">Signed in as <%= isSuper ? 'Super admin' : 'Admin' %></div>
+  </nav>
+  <main class="admin-main flex-grow-1">
+    <header class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h3 m-0"><%= title %></h1>
+      <form method="post" action="/admin/logout" class="d-flex align-items-center gap-3 m-0">
+        <span class="text-muted"><%= user.name %></span>
+        <button class="btn btn-outline-secondary btn-sm">Log out</button>
+      </form>
+    </header>
+

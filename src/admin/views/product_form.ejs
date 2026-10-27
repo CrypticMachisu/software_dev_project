@@ -1,0 +1,59 @@
+<%- include('partials/header') %>
+<%- include('partials/page-tools') %>
+<% const badge = { active: 'success', paused: 'warning', removed: 'danger', sold: 'secondary', draft: 'light' }; %>
+<a class="btn btn-link px-0 mb-2" href="/admin/products">&larr; Back to products</a>
+<% if (errors.length) { %><div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul></div><% } %>
+
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card"><div class="card-body">
+    <form method="post" action="<%= productId ? '/admin/products/' + productId + '/edit' : '/admin/products/new' %>" novalidate>
+      <% if (productId) { %>
+        <div class="mb-3"><label class="form-label">Seller</label><input class="form-control" value="<%= sellerName %>" disabled></div>
+      <% } else { %>
+        <div class="mb-3">
+          <label class="form-label" for="seller_id">Seller</label>
+          <select class="form-select" id="seller_id" name="seller_id" required>
+            <option value="">Choose an approved seller</option>
+            <% sellers.forEach(s => { %><option value="<%= s.user_id %>" <%= form.seller_id === String(s.user_id) ? 'selected' : '' %>><%= s.name %> (<%= s.email %>)</option><% }) %>
+          </select>
+        </div>
+      <% } %>
+      <div class="mb-3"><label class="form-label" for="title">Title</label><input class="form-control" id="title" name="title" maxlength="200" value="<%= form.title %>" required></div>
+      <div class="mb-3">
+        <label class="form-label" for="category_id">Category</label>
+        <select class="form-select" id="category_id" name="category_id" required>
+          <option value="">Choose a category</option>
+          <% categories.forEach(c => { %><option value="<%= c.category_id %>" <%= form.category_id === String(c.category_id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="mb-3"><label class="form-label" for="description">Description</label><textarea class="form-control" id="description" name="description" rows="4" maxlength="4000"><%= form.description %></textarea></div>
+      <div class="row">
+        <div class="col-6 mb-3"><label class="form-label" for="asking_price">Price (KES)</label><input class="form-control" id="asking_price" name="asking_price" inputmode="decimal" value="<%= form.asking_price %>" required></div>
+        <div class="col-6 mb-3"><label class="form-label" for="quantity_available">Stock</label><input class="form-control" id="quantity_available" name="quantity_available" inputmode="numeric" value="<%= form.quantity_available %>" required></div>
+      </div>
+      <button class="btn btn-success"><%= productId ? 'Save changes' : 'Add product' %></button>
+    </form>
+  </div></div></div>
+
+  <% if (productId) { %>
+  <div class="col-lg-5"><div class="card"><div class="card-body">
+    <h2 class="h6">Moderation</h2>
+    <p class="mb-3">Current status: <span class="badge text-bg-<%= badge[listingStatus] || 'secondary' %>"><%= listingStatus %></span></p>
+    <form method="post" action="/admin/products/<%= productId %>/status" data-confirm="Change the status of this listing?">
+      <div class="mb-3">
+        <label class="form-label" for="status">Set status</label>
+        <select class="form-select" id="status" name="status">
+          <% moderationStatuses.forEach(s => { %><option value="<%= s %>" <%= listingStatus === s ? 'selected' : '' %>><%= s %></option><% }) %>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="reason">Reason <span class="text-muted small">(required to pause or remove)</span></label>
+        <input class="form-control" id="reason" name="reason" maxlength="500" placeholder="e.g. Prohibited item">
+      </div>
+      <button class="btn btn-outline-danger">Update status</button>
+    </form>
+    <p class="text-muted small mt-3 mb-0">Listings are never deleted, because past orders refer to them. "Removed" hides the listing from buyers.</p>
+  </div></div></div>
+  <% } %>
+</div>
+<%- include('partials/footer') %>

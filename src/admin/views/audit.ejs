@@ -1,0 +1,42 @@
+<%- include('partials/header') %>
+<%- include('partials/page-tools') %>
+<form class="row g-2 mb-3" method="get" action="/admin/audit">
+  <div class="col-md-3"><input class="form-control" name="q" value="<%= f.q %>" placeholder="Search action or details"></div>
+  <div class="col-md-2">
+    <select class="form-select" name="user" aria-label="Admin">
+      <option value="">Any admin</option>
+      <% admins.forEach(a => { %><option value="<%= a.user_id %>" <%= f.user === String(a.user_id) ? 'selected' : '' %>><%= a.name %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="action" aria-label="Action">
+      <option value="">Any action</option>
+      <% actions.forEach(a => { %><option value="<%= a %>" <%= f.action === a ? 'selected' : '' %>><%= a %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-2"><input class="form-control" type="date" name="from" value="<%= f.from %>" aria-label="From date"></div>
+  <div class="col-md-2"><input class="form-control" type="date" name="to" value="<%= f.to %>" aria-label="To date"></div>
+  <div class="col-auto"><button class="btn btn-success">Filter</button> <a class="btn btn-outline-secondary" href="/admin/audit">Clear</a></div>
+</form>
+
+<div class="card"><div class="card-body">
+<% if (!rows.length) { %><p class="text-muted mb-0">No log entries match.</p><% } else { %>
+<div class="table-responsive"><table class="table table-sm align-middle mb-0">
+  <thead><tr><th>When</th><th>Admin</th><th>Action</th><th>Target</th><th>Details</th><th>IP</th></tr></thead>
+  <tbody>
+  <% rows.forEach(a => { %>
+    <tr>
+      <td class="text-nowrap"><%= fmtDate(a.created_at) %></td>
+      <td><%= a.admin_name %></td>
+      <td><code><%= a.action %></code></td>
+      <td><%= a.target_table ? a.target_table + (a.target_id ? ' #' + a.target_id : '') : '-' %></td>
+      <td><%= a.details || '' %></td>
+      <td><%= a.ip || '' %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table></div>
+<% } %>
+<%- include('partials/pager') %>
+</div></div>
+<%- include('partials/footer') %>

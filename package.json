@@ -5,14 +5,23 @@
   "scripts": {
     "build": "tsc",
     "migrate": "node --env-file=.env dist/src/migrate.js",
-    "start": "node --env-file=.env dist/src/server.js"
+    "start": "node --env-file=.env dist/src/server.js",
+    "dev": "tsc && node --env-file=.env dist/src/server.js",
+    "admin:seed": "node --env-file=.env dist/src/scripts/seed-admin.js"
   },
   "dependencies": {
     "@neon/config": "^1.9.3",
     "@neon/env": "^1.6.4",
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
     "pg": "^8.16.3"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^4.17.21",
     "@types/node": "^24.9.1",
     "@types/pg": "^8.15.5",
     "typescript": "^5.9.3"

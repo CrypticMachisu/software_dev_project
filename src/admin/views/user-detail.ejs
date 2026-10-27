@@ -1,0 +1,104 @@
+<%- include('partials/header') %>
+<% const badge = { active: 'success', suspended: 'warning', closed: 'secondary' };
+   const roleBadge = (r) => r.status === 'approved' ? 'text-bg-success' : r.status === 'pending' ? 'text-bg-warning' : 'text-bg-danger';
+   const held = target.roles.map(r => r.role);
+   const priv = (r) => r === 'admin' || r === 'super_admin'; %>
+<p><a href="/admin/users" class="text-decoration-none"><i class="fa-solid fa-arrow-left"></i> All users</a></p>
+<% if (ok) { %><div class="alert alert-success py-2"><%= ok %></div><% } %>
+<% if (error) { %><div class="alert alert-danger py-2"><%= error %></div><% } %>
+
+<% if (resetLink) { %>
+<div class="alert alert-info">
+  <strong>Password reset link</strong> (shown once, valid for <%= resetMinutes %> minutes, works one time). Send it to the user securely:
+  <div class="input-group mt-2">
+    <input class="form-control" id="reset-link" readonly value="<%= resetLink %>">
+    <button class="btn btn-outline-secondary" type="button" id="copy-link">Copy</button>
+  </div>
+</div>
+<% } %>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6"><div class="card h-100"><div class="card-body">
+    <h2 class="h6">Account</h2>
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Name</dt><dd class="col-sm-8"><%= target.name %></dd>
+      <dt class="col-sm-4">Email</dt><dd class="col-sm-8"><%= target.email %></dd>
+      <dt class="col-sm-4">Phone</dt><dd class="col-sm-8"><%= target.phone || '—' %></dd>
+      <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><span class="badge text-bg-<%= badge[target.account_status] || 'secondary' %>"><%= target.account_status %></span></dd>
+      <dt class="col-sm-4">Joined</dt><dd class="col-sm-8"><%= fmtDate(target.created_at) %></dd>
+    </dl>
+  </div></div></div>
+
+  <div class="col-lg-6"><div class="card h-100"><div class="card-body">
+    <h2 class="h6">Actions</h2>
+    <% if (!canManage) { %>
+      <p class="text-muted mb-0">This is an admin account. Only a super admin can change it.</p>
+    <% } else { %>
+      <div class="d-flex flex-wrap gap-2">
+        <% if (!isSelf) { %>
+          <% if (target.account_status === 'active') { %>
+            <form method="post" action="/admin/users/<%= target.user_id %>/status" data-confirm="Suspend this account? They will be signed out.">
+              <input type="hidden" name="status" value="suspended"><button class="btn btn-outline-warning btn-sm">Suspend</button></form>
+          <% } else { %>
+            <form method="post" action="/admin/users/<%= target.user_id %>/status">
+              <input type="hidden" name="status" value="active"><button class="btn btn-outline-success btn-sm">Reactivate</button></form>
+          <% } %>
+        <% } %>
+        <form method="post" action="/admin/users/<%= target.user_id %>/reset-link" data-confirm="Create a new reset link? Any earlier unused link stops working.">
+          <button class="btn btn-outline-secondary btn-sm">Reset password</button></form>
+      </div>
+      <% if (isSelf) { %><p class="text-muted small mt-2 mb-0">You cannot suspend your own account.</p><% } %>
+    <% } %>
+  </div></div></div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Roles</h2>
+  <% if (!target.roles.length) { %><p class="text-muted">No roles assigned.</p><% } else { %>
+  <div class="table-responsive"><table class="table table-sm align-middle">
+    <thead><tr><th>Role</th><th>Approval</th><th class="text-end">Actions</th></tr></thead>
+    <tbody>
+    <% target.roles.forEach(r => { const mayAct = canManage && !(isSelf && priv(r.role)); %>
+      <tr>
+        <td><%= r.role %></td>
+        <td><span class="badge <%= roleBadge(r) %>"><%= r.status %></span></td>
+        <td class="text-end">
+          <% if (mayAct) { %>
+            <div class="d-inline-flex gap-1">
+            <% if (r.status !== 'approved') { %>
+              <form method="post" action="/admin/users/<%= target.user_id %>/approval"><input type="hidden" name="role" value="<%= r.role %>"><input type="hidden" name="decision" value="approved"><button class="btn btn-success btn-sm">Approve</button></form>
+            <% } %>
+            <% if (r.status !== 'rejected') { %>
+              <form method="post" action="/admin/users/<%= target.user_id %>/approval"><input type="hidden" name="role" value="<%= r.role %>"><input type="hidden" name="decision" value="rejected"><button class="btn btn-outline-danger btn-sm">Reject</button></form>
+            <% } %>
+              <form method="post" action="/admin/users/<%= target.user_id %>/roles/remove" data-confirm="Remove the <%= r.role %> role?"><input type="hidden" name="role" value="<%= r.role %>"><button class="btn btn-outline-secondary btn-sm">Remove</button></form>
+            </div>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div>
+  <% } %>
+
+  <% if (canManage) { const addable = ROLES.filter(r => !held.includes(r) && (canPrivileged || !priv(r))); %>
+    <% if (addable.length) { %>
+    <form method="post" action="/admin/users/<%= target.user_id %>/roles" class="d-flex gap-2 mt-2" style="max-width: 360px">
+      <select class="form-select form-select-sm" name="role" aria-label="Role to grant">
+        <% addable.forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
+      </select>
+      <button class="btn btn-outline-success btn-sm text-nowrap">Grant role</button>
+    </form>
+    <% } %>
+  <% } %>
+</div></div>
+
+<div class="card"><div class="card-body">
+  <h2 class="h6">Recent activity</h2>
+  <% if (!audit.length) { %><p class="text-muted mb-0">No activity recorded yet.</p><% } else { %>
+  <div class="table-responsive"><table class="table table-sm mb-0">
+    <thead><tr><th>When</th><th>By</th><th>Action</th><th>Details</th></tr></thead>
+    <tbody><% audit.forEach(a => { %><tr><td class="small"><%= fmtDate(a.created_at) %></td><td><%= a.actor %></td><td><code><%= a.action %></code></td><td class="small text-muted"><%= a.details || '' %></td></tr><% }) %></tbody>
+  </table></div><% } %>
+</div></div>
+<%- include('partials/footer') %>

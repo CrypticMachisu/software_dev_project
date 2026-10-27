@@ -1,0 +1,4 @@
+<%# Flash messages (shown once, from a cookie) and the confirm-dialog script. Include right after the header partial. %>
+<% if (locals.msg) { %><div class="alert alert-success py-2" role="status"><%= msg %></div><% } %>
+<% if (locals.err) { %><div class="alert alert-danger py-2" role="alert"><%= err %></div><% } %>
+<script src="/admin/static/js/admin.js" defer></script>
