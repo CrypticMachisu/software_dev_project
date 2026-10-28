@@ -1,4 +1,6 @@
 import http from "node:http";
+import path from "node:path";
+import fs from "node:fs";
 import { adminApp } from "./admin/app.js";
 import { pool } from "./db.js";
 import { env } from "./env.js";
@@ -8,12 +10,23 @@ const port = Number(process.env.PORT ?? 3000);
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
-  // Admin panel: every /admin request is handled by the Express app in src/admin/app.ts
+  // 1. Admin panel route
   if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
     adminApp(req, res);
     return;
   }
 
+  // 2. Serve public client frontend (index.html)
+  if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
+    const indexPath = path.resolve(process.cwd(), "src", "public", "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(fs.readFileSync(indexPath, "utf8"));
+      return;
+    }
+  }
+
+  // 3. Health check route
   if (req.method === "GET" && url.pathname === "/health") {
     try {
       const ping = await pool.query<{ ok: number; db: string }>(
