@@ -3,18 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Marketplace</title>
+<title>M-DUKA</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 <style>
-/* CSS styles matching the index.html and template layout */
-:root{--bg:#f6f7f9;--card:#fff;--ink:#17222d;--mute:#64707d;--line:#dde2e8;--acc:#2f6fde;--acc-ink:#fff;--ok:#2e7d32;--warn:#b26a00;--bad:#c33;--chip:#eef1f5}
-@media(prefers-color-scheme:dark){:root{--bg:#10151b;--card:#18202a;--ink:#e8edf2;--mute:#93a0ae;--line:#2b3644;--acc:#5b92f0;--acc-ink:#0b1220;--chip:#222c38;--ok:#6fcf74;--warn:#e6a23c;--bad:#ff7b7b}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-h1,h2,h3{font-family:Georgia,"Iowan Old Style",serif;line-height:1.2;margin:0 0 .6rem}h1{font-size:1.7rem}h2{font-size:1.25rem}
+/* M-DUKA: look and feel matched to the admin panel */
+:root{--bg:#f4f7f5;--card:#fff;--ink:#1c1f1e;--mute:#6b7773;--line:#dde4e0;--acc:#0f6e56;--acc-ink:#fff;--ok:#1e7a4d;--warn:#a86400;--bad:#c0392b;--chip:#e9f0ec;--side:#17221f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+h1,h2,h3{font-weight:600;line-height:1.25;margin:0 0 .6rem}h1{font-size:1.75rem}h2{font-size:1.25rem}h3{font-size:1.05rem}
 a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
-nav{display:flex;gap:1rem;align-items:center;padding:.7rem 1.2rem;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
-nav .brand{font:700 1.2rem Georgia,serif;color:var(--ink)}nav .sp{flex:1}
-main{max-width:1080px;margin:0 auto;padding:1.2rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1rem}
+.shell{display:flex;min-height:100vh}
+#nav{width:230px;flex:none;background:var(--side);padding:20px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;align-self:flex-start}
+#nav .brand{color:#fff;font-size:20px;font-weight:700;padding:4px 14px 18px}#nav .brand small{display:block;font-size:12px;font-weight:400;color:#b7c4bf}
+.nav-item-link{display:block;padding:11px 14px;border-radius:6px;font-size:14px;color:#e8eeeb}.nav-item-link i{width:22px}
+.nav-item-link:hover{background:#22332e;color:#fff;text-decoration:none}.nav-item-link.active{background:#2a4a41;font-weight:600;color:#fff}
+.signed-in{margin-top:auto;padding:14px;font-size:12px;color:#b7c4bf}
+.content{flex:1;min-width:0;padding:28px 32px}#top{display:flex;gap:.8rem;align-items:center;margin-bottom:1.5rem}#top input{max-width:320px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:1rem}
+.card>.mute+h2{font-size:28px;font-weight:700;margin:.2rem 0 0}
+.btn:hover{text-decoration:none}.out{background:transparent;color:#6c757d;border-color:#6c757d}
+input,select,textarea{background:#fff}
+@media(max-width:768px){.shell{flex-direction:column}#nav{width:auto;height:auto;position:static;flex-direction:row;flex-wrap:wrap;padding:10px}#nav .brand{width:100%;padding:4px 10px 8px}.signed-in{display:none}.content{padding:16px}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem}
 .layout{display:grid;grid-template-columns:210px 1fr;gap:1.2rem}@media(max-width:760px){.layout,.two{grid-template-columns:1fr!important}}
 .two{display:grid;grid-template-columns:1fr 340px;gap:1.2rem;align-items:start}
@@ -115,8 +123,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 -->
 
-<nav id="nav"></nav>
-<main id="app"></main>
+<div class="shell"><nav id="nav"></nav><div class="content"><header id="top"></header><main id="app"></main></div></div>
 
 <script>
 /* ===== Utilities ===== */
@@ -184,9 +191,10 @@ const STEPS=["new","confirmed","shipped","completed"], LABEL={awaiting_payment:"
 /* ===== Rendering Views ===== */
 const stars=n=>"★".repeat(Math.round(n))+"☆".repeat(5-Math.round(n));
 const ratingTxt=sid=>{const r=Api.rating(sid);return r?`${stars(r.avg)} ${r.avg.toFixed(1)} (${r.n})`:"No reviews yet"};
-function navbar(){const u=auth.user;
- $("#nav").innerHTML=`<a class="brand" href="#/">Marketplace</a><input id="q" style="max-width:300px" placeholder="Search products" value="${esc(catalog.query)}" aria-label="Search products"><span class="sp"></span>
- <a href="#/cart">Cart (${cart.count()})</a>${u?`<a href="#/orders">My orders</a>${auth.hasRole("seller")?'<a href="#/seller">Sell</a>':'<a href="#/seller">Become a seller</a>'}<span class="mute">${esc(u.name)}</span><a href="#" data-act="logout">Log out</a>`:'<a href="#/login">Log in</a>'}`}
+function navbar(){const u=auth.user,h=location.hash||"#/",on=(...p)=>p.some(x=>x=="#/"?(h=="#/"||h==""||h.startsWith("#/product")):h.startsWith(x))?" active":"";
+ const L=(href,ic,t,a)=>`<a class="nav-item-link${a}" href="${href}"><i class="fa-solid fa-${ic}"></i> ${t}</a>`;
+ $("#nav").innerHTML=`<div class="brand">M-DUKA<small>Shop</small></div>${L("#/","store","Browse",on("#/"))}${L("#/cart","cart-shopping",`Cart (${cart.count()})`,on("#/cart","#/checkout"))}${u?L("#/orders","receipt","My orders",on("#/orders","#/pay","#/result"))+L("#/seller","box",auth.hasRole("seller")?"Sell":"Become a seller",on("#/seller")):L("#/login","right-to-bracket","Log in",on("#/login"))}<div class="signed-in">${u?"Signed in as "+esc(u.name):"Browsing as guest"}</div>`;
+ $("#top").innerHTML=`<input id="q" placeholder="Search products" value="${esc(catalog.query)}" aria-label="Search products"><span class="sp"></span>${u?`<span class="mute">${esc(u.name)}</span><a href="#" data-act="logout" class="btn out sm">Log out</a>`:'<a href="#/login" class="btn sm">Log in</a>'}`}
 function needLogin(){if(auth.user)return false;location.hash="#/login?next="+encodeURIComponent(location.hash);return true}
 
 const V={};
