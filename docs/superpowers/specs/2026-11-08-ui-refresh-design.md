@@ -187,21 +187,25 @@ COMMIT;
 
 ## 7. Motion
 
-Principles: explain state, never decorate; interruptible; respect reduced motion.
+Principles: explain state, never decorate; interruptible; respect reduced motion. Motion is tuned quieter than the first draft: route changes do not move content, and filter/sort never animates.
+
+Tokens: `--ease:cubic-bezier(.2,.7,.2,1)`, `--dur-1:120ms`, `--dur-2:180ms`, `--dur-3:240ms`.
 
 | Interaction | Treatment |
 |---|---|
-| Route/view change | View Transitions API: 180 ms crossfade + 6 px rise; instant fallback |
-| Card hover | 160 ms translateY(-2px) + shadow |
-| Press | scale(0.98), no bounce |
-| Filter drawer | 220 ms ease-out slide/fade |
-| Toast | 180 ms rise |
-| Browse first paint | 40 ms stagger for the first 5 cards, once per page load |
-| Filter/sort | No stagger; optional 80 ms fade |
+| Route/view change | View Transitions API: 160 ms crossfade only, no translate; instant fallback |
+| Card hover | 140 ms translateY(-2px) + shadow; hover-capable pointers only |
+| Press | scale(0.985) over 90 ms, no bounce |
+| Filter drawer | 180 ms opacity + 4 px rise on open; closes instantly |
+| Toast | 140 ms opacity + 4 px rise |
+| Browse first paint | 24 ms stagger for the first 4 cards, once per page load; max 72 ms |
+| Filter/sort | None; render immediately and keep focus |
 
 Implementation:
 
+- Use View Transitions only for route/view changes, never for cart quantity, filters or modal updates.
 - Guard `document.startViewTransition`; skip it when `prefers-reduced-motion: reduce`.
+- Apply the card hover lift inside `@media (hover:hover) and (pointer:fine)` so touch devices do not keep a raised card after a tap.
 - All animation/transition rules live inside `@media (prefers-reduced-motion: no-preference)`.
 - Global reduced-motion override sets animation/transition duration to `0.01ms`, disables smooth scroll and view transitions.
 - No GSAP, ScrollTrigger, parallax, pinned sections, autoplay or scroll-jacking.
