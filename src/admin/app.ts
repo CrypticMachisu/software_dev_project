@@ -2,6 +2,7 @@ import path from "node:path";
 import cookieParser from "cookie-parser";
 import express from "express";
 import helmet from "helmet";
+import { env } from "../env.js";
 import "./types.js";
 import { requireAdmin, requireRole } from "./auth.js";
 import { auditRouter } from "./routes/audit.js";
@@ -30,6 +31,7 @@ adminApp.use(
         "style-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
         "script-src": ["'self'", "https://cdn.jsdelivr.net"],
         "font-src": ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+        "img-src": ["'self'", "data:", "https:"],
         "upgrade-insecure-requests": null,
       },
     },
@@ -40,7 +42,7 @@ adminApp.use(cookieParser());
 adminApp.use("/admin/static", express.static(path.resolve(process.cwd(), "src", "admin", "public")));
 
 // Display helpers available in every view
-adminApp.locals.money = (minor: string | number, cur = "KES"): string =>
+adminApp.locals.money = (minor: string | number, cur = env.currency): string =>
   `${cur} ${(Number(minor) / 100).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 adminApp.locals.fmtDate = (d: string | Date): string => new Date(d).toLocaleString("en-KE");
 
