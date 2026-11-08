@@ -46,6 +46,12 @@ h2{font-size:1.3rem}h3{font-size:1.05rem}
 a{color:var(--acc);text-decoration:none;text-underline-offset:3px}
 a:hover{text-decoration:underline}
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+.skip{position:fixed;left:1rem;top:-4rem;z-index:100;background:var(--card);color:var(--ink);
+  padding:.7rem 1rem;border-radius:999px;border:1px solid var(--line);box-shadow:var(--shadow)}
+.skip:focus{top:1rem}
+#app:focus{outline:none}
+nav .pill,aside .fcat,.btn,button,summary{min-height:44px}
+aside .fcat{padding:.55rem .78rem}
 
 /* ---- announce strip + top bar ---- */
 .announce{display:block;text-align:center;padding:.36rem 1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -181,7 +187,9 @@ td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);ve
 /* ---- modal, toast, reviews ---- */
 .modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;
   background:rgba(24,18,10,.45);backdrop-filter:blur(4px);animation:fade .2s ease-out}
-.modal .card{width:min(440px,92vw);border-radius:22px;box-shadow:var(--shadow)}
+.modal .card{width:min(440px,92vw);border-radius:22px;box-shadow:var(--shadow);position:relative}
+.modal-close{position:absolute;right:.7rem;top:.6rem;min-width:44px;min-height:44px;
+  background:transparent;border:1px solid var(--line);color:var(--ink);font-size:1.3rem}
 .stars button{background:none;border:none;padding:0 .1rem;color:var(--star);font-size:1.8rem}
 .toast{position:fixed;bottom:1.1rem;left:50%;transform:translateX(-50%);
   background:var(--ink);color:var(--bg);padding:.55rem 1.2rem;border-radius:999px;
@@ -205,10 +213,11 @@ td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);ve
   </style>
 </head>
 <body>
+<a class="skip" href="#app">Skip to content</a>
 <div class="announce">Fresh finds weekly<span class="sep">✳</span>Pickup or delivery<span class="sep">✳</span>Every order buyer-protected</div>
 
 <nav id="nav"></nav>
-<main id="app"></main>
+<main id="app" tabindex="-1"></main>
 
 <script>
 /* ===== Utilities ===== */
@@ -216,7 +225,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money=(m,c="USD")=>new Intl.NumberFormat("en",{style:"currency",currency:c}).format(m/100);
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-function toast(t){const e=document.createElement("div");e.className="toast";e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2200)}
+function toast(t){const e=document.createElement("div");e.className="toast";e.setAttribute("role","status");e.setAttribute("aria-live","polite");e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),3500)}
 
 /* ===== API client (talks to /api on the server: Postgres-backed) ===== */
 async function api(path,opts){const r=await fetch("/api"+path,{credentials:"same-origin",...opts});
@@ -279,7 +288,7 @@ V.login=(a,q)=>`<div class="card" style="max-width:400px;margin:2rem auto"><h1>W
 V.browse=()=>{const f=catalog,base=db.products;let ps=base.filter(p=>(!f.categoryId||p.categoryId==f.categoryId)&&(!f.query||p.title.toLowerCase().includes(f.query.toLowerCase()))&&(f.min===""||p.priceMinor>=f.min*100)&&(f.max===""||p.priceMinor<=f.max*100));
  ps.sort((a,b)=>f.sort=="lo"?a.priceMinor-b.priceMinor:f.sort=="hi"?b.priceMinor-a.priceMinor:b.id-a.id);
  const cnt=id=>base.filter(p=>!id||p.categoryId==id).length,dirty=!!(f.categoryId||f.query||f.min!==""||f.max!=="");
- return `<div class="layout"><aside aria-label="Filters"><h3>Categories</h3><div class="fcats">
+ return `<h1>Browse the market</h1><div class="layout"><aside aria-label="Filters"><h3>Categories</h3><div class="fcats">
  <a class="fcat ${f.categoryId?"":"on"}" href="#" data-act="cat" data-id="0"><span>All</span><span class="cnt">${cnt(0)}</span></a>
  ${db.categories.map(c=>`<a class="fcat ${f.categoryId==c.id?"on":""}" href="#" data-act="cat" data-id="${c.id}"><span>${esc(c.name)}</span><span class="cnt">${cnt(c.id)}</span></a>`).join("")}</div>
  <h3>Price (USD)</h3><div class="prange"><input id="min" inputmode="numeric" placeholder="Min" maxlength="7" value="${esc(f.min)}" aria-label="Minimum price"><span class="dash">–</span><input id="max" inputmode="numeric" placeholder="Max" maxlength="7" value="${esc(f.max)}" aria-label="Maximum price"></div>
@@ -355,12 +364,43 @@ const A={
   call("POST",`/order/${id}/pay`,{result:st}).then(()=>route()).catch(x=>toast(x.message))},
  receive(e){call("POST",`/seller-orders/${e.dataset.id}/status`,{action:"buyer:receive"}).then(()=>route()).catch(x=>toast(x.message))},
  refund(e){call("POST",`/seller-orders/${e.dataset.id}/refund`).then(()=>{route();toast("Refund requested")}).catch(x=>toast(x.message))},
- review(e){const id=+e.dataset.id;let r=5;const m=document.createElement("div");m.className="modal";
-  const draw=()=>{m.innerHTML=`<div class="card"><h2>Review your seller</h2><div class="stars">${[1,2,3,4,5].map(n=>`<button data-r="${n}" aria-label="${n} stars">${n<=r?"★":"☆"}</button>`).join("")}</div><label>Comment</label><textarea id="rc" rows="4"></textarea><div class="row" style="margin-top:.8rem"><button data-x="ok">Submit review</button><button class="ghost" data-x="no">Cancel</button></div><p class="mute">One review per completed order.</p></div>`};
-  draw();m.onclick=ev=>{const t=ev.target.closest("button");if(!t)return;
-   if(t.dataset.r){r=+t.dataset.r;const c=$("#rc").value;draw();$("#rc").value=c}
-   else if(t.dataset.x=="ok"){call("POST","/reviews",{sellerOrderId:id,rating:r,comment:($("#rc")?.value??"")}).then(()=>{m.remove();route()}).catch(x=>toast(x.message))}
-   else m.remove()};document.body.append(m)},
+ review(e){
+  const id=+e.dataset.id,trigger=e;
+  let r=5;
+  const m=document.createElement("div");
+  m.className="modal";
+  m.setAttribute("role","dialog");
+  m.setAttribute("aria-modal","true");
+  m.setAttribute("aria-labelledby","review-title");
+  m.innerHTML=`<div class="card"><button type="button" class="modal-close" data-x="no" aria-label="Close review dialog">×</button>
+   <h2 id="review-title">Review your seller</h2>
+   <div class="stars" role="group" aria-label="Rating">${[1,2,3,4,5].map(n=>`<button type="button" data-r="${n}" aria-label="${n} star${n===1?"":"s"}" aria-pressed="${n===r}">${n<=r?"★":"☆"}</button>`).join("")}</div>
+   <label for="rc">Comment</label><textarea id="rc" rows="4"></textarea>
+   <div class="row" style="margin-top:.8rem"><button type="button" data-x="ok">Submit review</button><button type="button" class="ghost" data-x="no">Cancel</button></div>
+   <p class="mute">One review per completed order.</p></div>`;
+  const previous=document.activeElement;
+  const close=()=>{m.remove();document.removeEventListener("keydown",onKey);if(previous instanceof HTMLElement)previous.focus()};
+  const focusables=()=>[...m.querySelectorAll('button, textarea, [href], input, select, [tabindex]:not([tabindex="-1"])')].filter(el=>!el.hasAttribute("disabled"));
+  const onKey=ev=>{
+   if(ev.key==="Escape"){ev.preventDefault();close();return}
+   if(ev.key!=="Tab")return;
+   const f=focusables(),first=f[0],last=f[f.length-1];
+   if(!first)return;
+   if(ev.shiftKey&&document.activeElement===first){ev.preventDefault();last.focus()}
+   else if(!ev.shiftKey&&document.activeElement===last){ev.preventDefault();first.focus()}
+  };
+  m.addEventListener("click",ev=>{
+   const t=ev.target.closest("button");if(!t)return;
+   if(t.dataset.r){r=+t.dataset.r;m.querySelectorAll("[data-r]").forEach(b=>{const n=+b.dataset.r;b.textContent=n<=r?"★":"☆";b.setAttribute("aria-pressed",String(n===r))});return}
+   if(t.dataset.x==="no"){close();return}
+   call("POST","/reviews",{sellerOrderId:id,rating:r,comment:($("#rc")?.value??"")})
+    .then(()=>{close();route();toast("Review posted")})
+    .catch(x=>toast(x.message));
+  });
+  document.body.append(m);
+  document.addEventListener("keydown",onKey);
+  m.querySelector('[data-x="no"]').focus();
+ },
  so(e){call("POST",`/seller-orders/${e.dataset.id}/status`,{action:e.dataset.do}).then(()=>route()).catch(x=>toast(x.message))},
  ship(e){const t=prompt("Tracking number (optional)");if(t===null)return;
   call("POST",`/seller-orders/${e.dataset.id}/status`,{action:"seller:ship",tracking:t}).then(()=>route()).catch(x=>toast(x.message))},
