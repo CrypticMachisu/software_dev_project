@@ -77,6 +77,7 @@ async function createListing(jar, { title, priceMinor, qty, categoryId }) {
 
 async function main() {
   const anon = new Jar();
+  let appCurrency = "USD";
 
   section("1. Smoke / static");
   {
@@ -108,6 +109,8 @@ async function main() {
     ok("Bootstrap returns active products", products.length > 0, `${products.length}`);
     ok("Bootstrap returns exchange methods", (b.data?.methods ?? []).length > 0);
     ok("Bootstrap user is null for guest", b.data?.user === null);
+    appCurrency = b.data?.currency ?? "USD";
+    ok("Bootstrap exposes a configured three-letter currency", /^[A-Z]{3}$/.test(appCurrency), appCurrency);
   }
   {
     const r = await anon.json("/api/products?q=camera");
