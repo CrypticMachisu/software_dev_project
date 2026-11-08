@@ -1,6 +1,7 @@
 import http from "node:http";
 import path from "node:path";
 import fs from "node:fs";
+import { api } from "./api/index.js";
 import { adminApp } from "./admin/app.js";
 import { pool } from "./db.js";
 import { env } from "./env.js";
@@ -10,23 +11,40 @@ const port = Number(process.env.PORT ?? 3000);
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
-  // 1. Admin panel route
+  // 1. Storefront JSON API
+  if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    req.url = url.pathname.slice("/api".length) + url.search;
+    api(req, res);
+    return;
+  }
+
+  // 2. Admin panel route
   if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
     adminApp(req, res);
     return;
   }
 
-  // 2. Serve public client frontend (index.html)
+  // 3. Serve public client frontend (index.html)
   if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
     const indexPath = path.resolve(process.cwd(), "src", "public", "index.html");
     if (fs.existsSync(indexPath)) {
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+      });
       res.end(fs.readFileSync(indexPath, "utf8"));
       return;
     }
   }
 
-  // 3. Health check route
+  // 4. Health check route
   if (req.method === "GET" && url.pathname === "/health") {
     try {
       const ping = await pool.query<{ ok: number; db: string }>(
@@ -62,6 +80,11 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(404, { "content-type": "application/json" });
   res.end(JSON.stringify({ error: "not found" }));
 });
+
+// Outlive idle clients: the 5s defaults race with pooled browser connections and
+// cause occasional multi-second stalls on the next request.
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
 
 server.listen(port, () => {
   console.log(`listening on http://127.0.0.1:${port}`);

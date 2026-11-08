@@ -3,117 +3,198 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Marketplace</title>
+<title>M-DUKA — multi-seller marketplace</title>
 <style>
-/* CSS styles matching the index.html and template layout */
-:root{--bg:#f6f7f9;--card:#fff;--ink:#17222d;--mute:#64707d;--line:#dde2e8;--acc:#2f6fde;--acc-ink:#fff;--ok:#2e7d32;--warn:#b26a00;--bad:#c33;--chip:#eef1f5}
-@media(prefers-color-scheme:dark){:root{--bg:#10151b;--card:#18202a;--ink:#e8edf2;--mute:#93a0ae;--line:#2b3644;--acc:#5b92f0;--acc-ink:#0b1220;--chip:#222c38;--ok:#6fcf74;--warn:#e6a23c;--bad:#ff7b7b}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-h1,h2,h3{font-family:Georgia,"Iowan Old Style",serif;line-height:1.2;margin:0 0 .6rem}h1{font-size:1.7rem}h2{font-size:1.25rem}
-a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
-nav{display:flex;gap:1rem;align-items:center;padding:.7rem 1.2rem;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
-nav .brand{font:700 1.2rem Georgia,serif;color:var(--ink)}nav .sp{flex:1}
-main{max-width:1080px;margin:0 auto;padding:1.2rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1rem}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem}
-.layout{display:grid;grid-template-columns:210px 1fr;gap:1.2rem}@media(max-width:760px){.layout,.two{grid-template-columns:1fr!important}}
-.two{display:grid;grid-template-columns:1fr 340px;gap:1.2rem;align-items:start}
-.btn,button{font:inherit;padding:.45rem .9rem;border-radius:5px;border:1px solid var(--acc);background:var(--acc);color:var(--acc-ink);cursor:pointer;font-weight:600}
-.btn.ghost,button.ghost{background:transparent;color:var(--acc)}button.sm{padding:.2rem .55rem;font-size:.85rem}
-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-input,select,textarea{font:inherit;width:100%;padding:.45rem .6rem;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink)}
-input[type=checkbox],input[type=radio]{width:auto}label{display:block;margin:.6rem 0 .2rem;font-weight:600;font-size:.9rem}
-.row{display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}.sp{flex:1}.mute{color:var(--mute);font-size:.88rem}
-.pic{display:grid;place-items:center;background:var(--chip);border-radius:5px;font-size:3rem;height:120px}.pic.big{height:300px;font-size:7rem}
-.price{font-weight:700}.chip{display:inline-block;padding:.1rem .6rem;border-radius:99px;background:var(--chip);font-size:.8rem;font-weight:600}
-.chip.ok{color:var(--ok)}.chip.warn{color:var(--warn)}.chip.bad{color:var(--bad)}
-table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:.5rem;border-bottom:1px solid var(--line);vertical-align:middle}
-.steps{display:flex;gap:.4rem;align-items:center}.dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--acc)}.dot.on{background:var(--acc)}.bar{width:28px;height:2px;background:var(--line)}
-.group{background:var(--chip);padding:.4rem .7rem;font-weight:600;border-radius:5px;margin:.8rem 0 .3rem}
-.err{color:var(--bad);margin:.5rem 0}.ok{color:var(--ok)}
-.modal{position:fixed;inset:0;background:#0008;display:grid;place-items:center;z-index:20}.modal .card{width:min(440px,92vw)}
-.stars button{background:none;border:none;color:#f5b301;font-size:1.8rem;padding:0 .1rem}
-.toast{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.5rem 1rem;border-radius:5px;z-index:30}
-@media(prefers-reduced-motion:no-preference){main{animation:in .2s ease-out}@keyframes in{from{opacity:.4}}}
-</style>
+/* ===== M-DUKA storefront design system =====
+   Warm paper, terracotta accent, Fraunces display + Instrument Sans body. */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Instrument+Sans:wght@400..700&display=swap");
+
+:root{
+  --bg:#f7f2e8; --card:#fffcf4; --ink:#272b1f; --mute:#867d6a;
+  --line:#e7ddc8; --line-2:#efe8d9;
+  --acc:#b04f2a; --acc-deep:#8f3e20; --acc-ink:#fff8f1; --acc-soft:#f5e6d9;
+  --go:#3c7a4d; --go-soft:#e2eddf;
+  --warn:#a4712a; --warn-soft:#f3ead3;
+  --bad:#b23b34; --bad-soft:#f6e2de;
+  --chip:#f0e9d8;
+  --star:#d9972f;
+  --shadow:0 1px 2px rgba(66,55,34,.05),0 14px 34px -16px rgba(66,55,34,.20);
+  --shadow-soft:0 1px 2px rgba(66,55,34,.04),0 8px 22px -14px rgba(66,55,34,.16);
+  --r-lg:18px; --r-sm:10px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#17140e; --card:#211d15; --ink:#ece3cf; --mute:#a09477;
+    --line:#38301e; --line-2:#2e2818;
+    --acc:#d67c4b; --acc-deep:#e08a5c; --acc-ink:#221004; --acc-soft:#332015;
+    --go:#82bd90; --go-soft:#1f2c22;
+    --warn:#d9a44c; --warn-soft:#312513;
+    --bad:#e07f7a; --bad-soft:#3a1e1b;
+    --chip:#2b2518;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 16px 38px -18px rgba(0,0,0,.55);
+    --shadow-soft:0 1px 2px rgba(0,0,0,.35),0 10px 26px -16px rgba(0,0,0,.45);
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.55 "Instrument Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:560;line-height:1.15;letter-spacing:-.015em;margin:0 0 .55rem}
+h1{font-size:clamp(1.75rem,1.25rem+1.6vw,2.35rem)}
+h2{font-size:1.3rem}h3{font-size:1.05rem}
+a{color:var(--acc);text-decoration:none;text-underline-offset:3px}
+a:hover{text-decoration:underline}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+
+/* ---- announce strip + top bar ---- */
+.announce{display:block;text-align:center;padding:.36rem 1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:.72rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  background:var(--acc);color:var(--acc-ink)}
+.announce .sep{margin:0 .55rem;opacity:.6}
+nav{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;
+  padding:.7rem clamp(1rem,4vw,2rem);position:sticky;top:0;z-index:5;
+  background:color-mix(in srgb,var(--card) 85%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav .brand{font:italic 600 1.5rem/1 Fraunces,Georgia,serif;color:var(--ink);letter-spacing:-.01em}
+nav .brand:hover{text-decoration:none}
+nav .brand::after{content:".";color:var(--acc)}
+nav .brand-sub{font-size:.66rem;font-weight:600;text-transform:uppercase;letter-spacing:.16em;
+  line-height:1.5;color:var(--mute);margin-left:-.15rem}
+nav .sp{flex:1}
+nav .pill{display:inline-flex;gap:.45rem;align-items:center;padding:.42rem .95rem;
+  border:1px solid var(--line);border-radius:999px;font-weight:600;font-size:.9rem;color:var(--ink);
+  background:var(--card);transition:border-color .2s,color .2s,background .2s}
+nav .pill:hover{border-color:var(--acc);color:var(--acc);background:var(--acc-soft);text-decoration:none}
+nav .badge{display:inline-grid;place-items:center;min-width:1.35rem;height:1.35rem;padding:0 .32rem;
+  border-radius:999px;background:var(--acc);color:var(--acc-ink);font-size:.72rem;font-weight:700;
+  font-variant-numeric:tabular-nums}
+nav .who{color:var(--mute);font-size:.9rem;padding-left:.35rem}
+nav .quiet{color:var(--mute);font-size:.9rem}
+nav .quiet:hover{color:var(--bad)}
+.search{position:relative;display:inline-flex;align-items:center;width:min(300px,100%)}
+.search svg{position:absolute;left:.85rem;width:15px;height:15px;color:var(--mute);pointer-events:none}
+#q{border-radius:999px;background:var(--bg);padding-left:2.4rem;transition:background .25s,box-shadow .25s}
+#q:focus{background:var(--card);box-shadow:0 0 0 3px var(--acc-soft)}
+main{max-width:1140px;margin:0 auto;padding:1.7rem clamp(1rem,4vw,2rem) 4.5rem}
+
+/* ---- layout ---- */
+.layout{display:grid;grid-template-columns:220px 1fr;gap:1.7rem;align-items:start}
+.two{display:grid;grid-template-columns:1fr 340px;gap:1.7rem;align-items:start}
+@media(max-width:880px){.layout,.two{grid-template-columns:1fr}aside{position:static}}
+@media(max-width:760px){nav .brand-sub{display:none}nav .who{display:none}
+  nav .search{order:9;width:100%;max-width:none}}
+
+/* ---- panels ---- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.15rem;box-shadow:var(--shadow-soft)}
+aside{position:sticky;top:4.6rem}
+aside h3{font-size:.74rem;font-family:inherit;text-transform:uppercase;letter-spacing:.11em;
+  color:var(--mute);margin:1.35rem 0 .45rem}
+aside h3:first-child{margin-top:.15rem}
+aside .fcats{display:flex;flex-direction:column;gap:.15rem}
+aside .fcat{display:flex;justify-content:space-between;align-items:center;gap:.6rem;
+  padding:.42rem .78rem;border-radius:999px;color:var(--ink);font-size:.92rem;
+  transition:background .18s,color .18s}
+aside .fcat:hover{background:var(--acc-soft);text-decoration:none}
+aside .fcat.on{background:var(--acc);color:var(--acc-ink);font-weight:600}
+aside .fcat.on:hover{background:var(--acc-deep)}
+aside .cnt{font-size:.72rem;color:var(--mute);font-variant-numeric:tabular-nums}
+aside .fcat.on .cnt{color:var(--acc-ink);opacity:.72}
+aside .prange{display:flex;align-items:center;gap:.4rem;max-width:190px}
+aside .prange input{padding:.42rem .62rem;font-size:.9rem}
+aside .prange .dash{color:var(--mute)}
+aside .fbtns{display:flex;gap:.5rem;margin-top:.6rem}
+aside .fhint{margin-top:.55rem;font-size:.76rem}
+.empty{display:grid;place-items:center;text-align:center;padding:2.6rem 1.2rem;margin-top:.8rem;gap:.2rem}
+
+/* ---- product grid ---- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:1.05rem}
+.grid>.card{padding:.55rem .55rem 1rem;border-radius:var(--r-lg);
+  transition:transform .35s cubic-bezier(.32,.72,0,1),box-shadow .3s .03s cubic-bezier(.32,.72,0,1)}
+.grid>.card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.grid>.card a:hover{text-decoration:none}
+.grid>.card:hover a{text-decoration:underline}
+.pic{display:grid;place-items:center;height:150px;font-size:3.4rem;border-radius:calc(var(--r-lg) - 6px);
+  background:linear-gradient(150deg,var(--acc-soft),var(--chip))}
+.pic.big{height:320px;font-size:6.8rem;border-radius:var(--r-lg)}
+.price{font-family:Fraunces,Georgia,serif;font-weight:620;font-size:1.08rem;font-variant-numeric:tabular-nums}
+
+/* ---- seller analytics ---- */
+.bars{display:flex;align-items:flex-end;gap:.4rem;height:96px;margin-top:.7rem}
+.bars .b{flex:1;min-height:3px;background:linear-gradient(180deg,var(--acc),var(--acc-soft));
+  border-radius:5px 5px 2px 2px;transition:opacity .2s}
+.bars .b:hover{opacity:.72}
+
+/* ---- buttons ---- */
+.btn,button{font:inherit;font-weight:600;padding:.55rem 1.15rem;border-radius:999px;
+  border:1px solid var(--acc);background:var(--acc);color:var(--acc-ink);cursor:pointer;
+  transition:transform .22s cubic-bezier(.32,.72,0,1),background .22s,box-shadow .22s,border-color .22s}
+.btn:hover,button:hover{background:var(--acc-deep);border-color:var(--acc-deep);
+  transform:translateY(-1px);box-shadow:var(--shadow-soft);text-decoration:none;color:var(--acc-ink)}
+.btn:active,button:active{transform:scale(.97);box-shadow:none}
+.btn.ghost,button.ghost{background:transparent;color:var(--acc);border-color:var(--acc)}
+.btn.ghost:hover,button.ghost:hover{background:var(--acc-soft);color:var(--acc);transform:translateY(-1px)}
+button.sm{padding:.3rem .75rem;font-size:.85rem}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ---- forms ---- */
+input,select,textarea{font:inherit;width:100%;padding:.52rem .7rem;border:1px solid var(--line);
+  border-radius:var(--r-sm);background:var(--card);color:var(--ink);transition:border-color .2s,box-shadow .2s,background .2s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+input[type=checkbox],input[type=radio]{width:auto}
+label{display:block;margin:.75rem 0 .28rem;font-weight:600;font-size:.82rem}
+.row{display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.mute{color:var(--mute);font-size:.88rem}
+
+/* ---- status chips: tinted, never raw color ---- */
+.chip{display:inline-flex;align-items:center;gap:.3rem;padding:.18rem .7rem;border-radius:999px;
+  background:var(--chip);color:var(--ink);font-size:.78rem;font-weight:600}
+.chip.ok{background:var(--go-soft);color:var(--go)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+
+/* ---- tables ---- */
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--line);
+  font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--mute)}
+td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);vertical-align:middle}
+
+/* ---- order steps ---- */
+.steps{display:flex;gap:.4rem;align-items:center}
+.dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--acc);opacity:.35;transition:opacity .2s}
+.dot.on{opacity:1}
+.bar{width:28px;height:2px;background:var(--line);border-radius:2px}
+.group{background:var(--chip);padding:.5rem .85rem;font-size:.84rem;font-weight:600;border-radius:999px;margin:1rem 0 .5rem}
+.err{color:var(--bad);margin:.5rem 0;font-size:.9rem}
+.ok{color:var(--go)}
+
+/* ---- modal, toast, reviews ---- */
+.modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;
+  background:rgba(24,18,10,.45);backdrop-filter:blur(4px);animation:fade .2s ease-out}
+.modal .card{width:min(440px,92vw);border-radius:22px;box-shadow:var(--shadow)}
+.stars button{background:none;border:none;padding:0 .1rem;color:var(--star);font-size:1.8rem}
+.toast{position:fixed;bottom:1.1rem;left:50%;transform:translateX(-50%);
+  background:var(--ink);color:var(--bg);padding:.55rem 1.2rem;border-radius:999px;
+  font-size:.9rem;z-index:30;box-shadow:var(--shadow);animation:rise .3s cubic-bezier(.32,.72,0,1)}
+
+/* ---- entry motion ---- */
+@media(prefers-reduced-motion:no-preference){
+  main{animation:rise .5s cubic-bezier(.32,.72,0,1) both}
+  .grid>.card{animation:rise .55s cubic-bezier(.32,.72,0,1) both}
+  .grid>.card:nth-child(2){animation-delay:.05s}
+  .grid>.card:nth-child(3){animation-delay:.1s}
+  .grid>.card:nth-child(4){animation-delay:.15s}
+  .grid>.card:nth-child(5){animation-delay:.2s}
+  .grid>.card:nth-child(6){animation-delay:.25s}
+  .grid>.card:nth-child(7){animation-delay:.3s}
+  .grid>.card:nth-child(8){animation-delay:.35s}
+  .grid>.card:nth-child(n+9){animation-delay:.4s}
+  @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+}
+  </style>
 </head>
 <body>
-
-<!-- Integrated SQL Schema Setup (Server Context Reference) -->
-<!--
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    pw VARCHAR(255) NOT NULL,
-    roles TEXT[] DEFAULT ARRAY['buyer']::TEXT[],
-    payouts BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE IF NOT EXISTS categories (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS exchange_methods (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS products (
-    id SERIAL PRIMARY KEY,
-    seller_id INT REFERENCES users(id),
-    title VARCHAR(255) NOT NULL,
-    category_id INT REFERENCES categories(id),
-    price INT NOT NULL,
-    quantity INT DEFAULT 1,
-    condition VARCHAR(50) DEFAULT 'Good',
-    pic VARCHAR(255) DEFAULT '📦',
-    description TEXT,
-    status VARCHAR(20) DEFAULT 'active',
-    currency VARCHAR(10) DEFAULT 'USD'
-);
-
-CREATE TABLE IF NOT EXISTS orders (
-    id SERIAL PRIMARY KEY,
-    buyer_id INT REFERENCES users(id),
-    currency VARCHAR(10) DEFAULT 'USD',
-    ordered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    address JSONB,
-    total_minor INT NOT NULL,
-    payment VARCHAR(50) DEFAULT 'pending'
-);
-
-CREATE TABLE IF NOT EXISTS seller_orders (
-    id SERIAL PRIMARY KEY,
-    order_id INT REFERENCES orders(id) ON DELETE CASCADE,
-    seller_id INT REFERENCES users(id),
-    method_id INT REFERENCES exchange_methods(id),
-    fulfillment VARCHAR(50) DEFAULT 'awaiting_payment',
-    release_status VARCHAR(50) DEFAULT 'none',
-    tracking VARCHAR(255) DEFAULT '',
-    refund_requested BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE IF NOT EXISTS seller_order_items (
-    id SERIAL PRIMARY KEY,
-    seller_order_id INT REFERENCES seller_orders(id) ON DELETE CASCADE,
-    product_id INT REFERENCES products(id),
-    title VARCHAR(255) NOT NULL,
-    qty INT NOT NULL,
-    unit_price INT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS reviews (
-    id SERIAL PRIMARY KEY,
-    seller_order_id INT REFERENCES seller_orders(id),
-    buyer_id INT REFERENCES users(id),
-    seller_id INT REFERENCES users(id),
-    rating INT CHECK (rating >= 1 AND rating <= 5),
-    comment TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
--->
+<div class="announce">Fresh finds weekly<span class="sep">✳</span>Pickup or delivery<span class="sep">✳</span>Every order buyer-protected</div>
 
 <nav id="nav"></nav>
 <main id="app"></main>
@@ -121,168 +202,196 @@ CREATE TABLE IF NOT EXISTS reviews (
 <script>
 /* ===== Utilities ===== */
 const $=s=>document.querySelector(s);
-const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc=s=>String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money=(m,c="USD")=>new Intl.NumberFormat("en",{style:"currency",currency:c}).format(m/100);
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 function toast(t){const e=document.createElement("div");e.className="toast";e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2200)}
 
-/* ===== Mock Backend & Database Storage ===== */
-const seed=()=>({seq:100,
- users:[{id:1,name:"Jane",email:"jane@example.com",pw:"password123",roles:["buyer","seller"],payouts:true},{id:2,name:"Sam",email:"sam@example.com",pw:"password123",roles:["buyer","seller"],payouts:true}],
- categories:["Electronics","Home & Garden","Fashion","Books","Toys"].map((name,i)=>({id:i+1,name})),
- methods:[{id:1,name:"Delivery"},{id:2,name:"Pickup"}],
- products:[[1,1,"Vintage film camera",1,4500,5,"📷","Fully working 35mm camera with leather case."],[2,1,"Desk lamp",2,2200,8,"💡","Brass reading lamp, warm light."],[3,1,"Wool scarf",3,1800,12,"🧣","Hand-knitted, charcoal."],[4,2,"Mechanical keyboard",1,7900,3,"⌨️","Tenkeyless, tactile switches."],[5,2,"Used paperback set",4,1200,20,"📚","Ten classic paperbacks."],[6,2,"Wooden train set",5,3500,4,"🚂","Solid beech, 40 pieces."],[7,2,"Ceramic planter",2,1600,9,"🪴","Glazed, with drainage tray."],[8,1,"Denim jacket",3,3900,6,"🧥","Medium, light wash."]]
-  .map(([id,sellerId,title,categoryId,price,qty,pic,description])=>({id,sellerId,title,categoryId,price,qty,pic,description,condition:"Good",status:"active",currency:"USD"})),
- orders:[],reviews:[]});
-let db=store.get("mkt_db",null)||seed(); const save=()=>store.set("mkt_db",db);
-const Api={
- user:id=>db.users.find(u=>u.id==id), product:id=>db.products.find(p=>p.id==id),
- sellerName:id=>Api.user(id)?.name??"Seller",
- rating(sid){const r=db.reviews.filter(x=>x.sellerId==sid);return r.length?{avg:r.reduce((a,x)=>a+x.rating,0)/r.length,n:r.length}:null},
- login(email,pw){const u=db.users.find(u=>u.email==email.trim().toLowerCase()&&u.pw==pw);if(!u)throw Error("Email or password is incorrect.");return u},
- register(name,email,pw){email=email.trim().toLowerCase();if(db.users.some(u=>u.email==email))throw Error("That email is already registered.");if(pw.length<8)throw Error("Use a password with at least 8 characters.");
-  const u={id:++db.seq,name,email,pw,roles:["buyer"],payouts:false};db.users.push(u);save();return u},
- placeOrder(buyer,cart,address,methodBySeller){const sellers=[...new Set(cart.items.map(i=>i.sellerId))];
-  const o={id:++db.seq,buyerId:buyer.id,currency:"USD",orderedAt:new Date().toISOString(),address,totalMinor:cart.subtotalMinor(),payment:"pending",
-   sellerOrders:sellers.map(s=>({id:++db.seq,sellerId:s,methodId:+methodBySeller[s]||1,fulfillment:"awaiting_payment",release:"none",tracking:"",
-    items:cart.items.filter(i=>i.sellerId==s).map(i=>({productId:i.productId,title:i.titleSnapshot,qty:i.quantity,unit:i.unitPriceMinor}))}))};
-  db.orders.push(o);save();return o},
- webhook(orderId,status){const o=Api.order(orderId);if(!o||o.payment!="pending")return;o.payment=status;
-  o.sellerOrders.forEach(s=>{s.fulfillment=status=="captured"?"new":"cancelled";if(status=="captured")s.items.forEach(i=>{const p=Api.product(i.productId);if(p)p.qty=Math.max(0,p.qty-i.qty)})});save()},
- order:id=>db.orders.find(o=>o.id==id),
- sellerOrder:id=>{for(const o of db.orders){const s=o.sellerOrders.find(s=>s.id==id);if(s)return{o,s}}},
- review(soId,buyerId,rating,comment){const {s}=Api.sellerOrder(soId);db.reviews.push({id:++db.seq,sellerOrderId:soId,buyerId,sellerId:s.sellerId,rating,comment,createdAt:new Date().toISOString()});save()}
-};
+/* ===== API client (talks to /api on the server: Postgres-backed) ===== */
+async function api(path,opts){const r=await fetch("/api"+path,{credentials:"same-origin",...opts});
+ const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Network error");return d}
+const call=(method,path,data)=>api(path,data===undefined?{method}:{method,headers:{"content-type":"application/json"},body:JSON.stringify(data)});
 
-/* ===== Frontend domain classes ===== */
-class AuthStore{
- constructor(){this.id=store.get("mkt_uid",null)}
- get user(){return this.id?Api.user(this.id):null}
- hasRole(r){return !!this.user?.roles.includes(r)}
- login(e,p){this.id=Api.login(e,p).id;store.set("mkt_uid",this.id)}
- register(n,e,p){this.id=Api.register(n,e,p).id;store.set("mkt_uid",this.id)}
- logout(){this.id=null;store.set("mkt_uid",null)}
-}
-class CartItem{constructor(p,q){Object.assign(this,{productId:p.id,sellerId:p.sellerId,titleSnapshot:p.title,unitPriceMinor:p.price,quantity:q,pic:p.pic})}lineTotalMinor(){return this.unitPriceMinor*this.quantity}}
+/* ===== App state (boots from /api/bootstrap, a Postgres snapshot) ===== */
+let db={user:null,categories:[],methods:[],products:[]}; // users come from the session; listings live server-side
+const PIC_BY_CATEGORY={electronics:"📷","home & garden":"🪴","home and garden":"🪴",fashion:"🧣",books:"📚",toys:"🚂"};
+const PIC_DEFAULT="📦";
+const pic=p=>PIC_BY_CATEGORY[String(p?.categoryName??"").toLowerCase()]??PIC_DEFAULT;
+const full=id=>db.products.find(p=>p.id==id);
+
+class CartItem{constructor(p,q){Object.assign(this,{productId:p.id,sellerId:p.sellerId,titleSnapshot:p.title,unitPriceMinor:p.priceMinor,quantity:q,pic:pic(p)})}lineTotalMinor(){return this.unitPriceMinor*this.quantity}}
 class Cart{
- constructor(){this.items=store.get("mkt_cart",[]).map(i=>Object.assign(new CartItem({id:0,sellerId:0,title:"",price:0}, 0),i))}
+ constructor(){this.items=store.get("mkt_cart",[]);this.persist()}
  persist(){store.set("mkt_cart",this.items)}
- addItem(productId,qty=1){const p=Api.product(productId),it=this.items.find(i=>i.productId==productId);
-  if(it)it.quantity=Math.min(p.qty,it.quantity+qty);else this.items.push(new CartItem(p,Math.min(p.qty,qty)));this.persist()}
- updateQuantity(id,q){const p=Api.product(id),it=this.items.find(i=>i.productId==id);it.quantity=Math.max(1,Math.min(p.qty,+q||1));this.persist()}
+ addItem(productId,qty=1){const p=full(productId),it=this.items.find(i=>i.productId==productId);
+  if(!p)return; // product went away between renders
+  if(it)it.quantity=Math.min(p.qty||1,it.quantity+qty);else this.items.push(new CartItem(p,Math.min(p.qty||1,qty)));this.persist()}
+ updateQuantity(id,q){const p=full(id),it=this.items.find(i=>i.productId==id);if(!it)return;
+  it.quantity=Math.max(1,Math.min(p?.qty??99,+q||1));this.persist()}
  removeItem(id){this.items=this.items.filter(i=>i.productId!=id);this.persist()}
  groupBySeller(){const g={};this.items.forEach(i=>(g[i.sellerId]??=[]).push(i));return g}
  subtotalMinor(){return this.items.reduce((a,i)=>a+i.lineTotalMinor(),0)}
  count(){return this.items.reduce((a,i)=>a+i.quantity,0)}
  clear(){this.items=[];this.persist()}
 }
-const auth=new AuthStore(), cart=new Cart();
+const auth={
+ get user(){return db.user},
+ hasRole(r){return !!this.user?.roles?.includes(r)},
+ async login(e,p){const {user}=await call("POST","/auth/login",{email:e,password:p});db.user=user},
+ async register(n,e,p){const {user}=await call("POST","/auth/register",{name:n,email:e,password:p});db.user=user},
+ async logout(){await call("POST","/auth/logout");db.user=null},
+ async becomeSeller(){const {user}=await call("POST","/roles/seller");db.user=user}};
+const cart=new Cart();
 const catalog={query:"",categoryId:0,min:"",max:"",sort:"new"};
 const checkout={address:store.get("mkt_addr",{}),methods:{}};
-const STEPS=["new","confirmed","shipped","completed"], LABEL={awaiting_payment:"Awaiting payment",new:"New",confirmed:"Confirmed",shipped:"Shipped",completed:"Completed",cancelled:"Cancelled",declined:"Declined"};
+const STEPS=["pending","confirmed","shipped","completed"],
+ LABEL={pending:"New",confirmed:"Confirmed",shipped:"Shipped",completed:"Completed",cancelled:"Cancelled",refunded:"Refunded",partially_refunded:"Partially refunded"};
 
 /* ===== Rendering Views ===== */
 const stars=n=>"★".repeat(Math.round(n))+"☆".repeat(5-Math.round(n));
-const ratingTxt=sid=>{const r=Api.rating(sid);return r?`${stars(r.avg)} ${r.avg.toFixed(1)} (${r.n})`:"No reviews yet"};
-function navbar(){const u=auth.user;
- $("#nav").innerHTML=`<a class="brand" href="#/">Marketplace</a><input id="q" style="max-width:300px" placeholder="Search products" value="${esc(catalog.query)}" aria-label="Search products"><span class="sp"></span>
- <a href="#/cart">Cart (${cart.count()})</a>${u?`<a href="#/orders">My orders</a>${auth.hasRole("seller")?'<a href="#/seller">Sell</a>':'<a href="#/seller">Become a seller</a>'}<span class="mute">${esc(u.name)}</span><a href="#" data-act="logout">Log out</a>`:'<a href="#/login">Log in</a>'}`}
+function navbar(){const u=auth.user,n=cart.count();
+ $("#nav").innerHTML=`<a class="brand" href="#/">M-DUKA</a><span class="brand-sub">Multi-seller<br>market</span>
+ <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search the market…" value="${esc(catalog.query)}" aria-label="Search products"></label><span class="sp"></span>
+ <a class="pill" href="#/cart">Cart${n?`<span class="badge">${n}</span>`:""}</a>
+ ${u?`<a class="pill" href="#/orders">My orders</a><a class="pill" href="#/seller">${auth.hasRole("seller")?"Sell":"Become a seller"}</a><span class="who">${esc(u.name)}</span><a class="quiet" href="#" data-act="logout">Log out</a>`
+ :`<span class="who">Browsing as guest</span><a class="pill" href="#/login">Log in</a>`}`}
 function needLogin(){if(auth.user)return false;location.hash="#/login?next="+encodeURIComponent(location.hash);return true}
+const errBox=(msg)=>`<div class="card empty"><h2>Something went wrong</h2><p class="mute">${esc(msg)}</p><a class="btn ghost" href="#/">Back to the market</a></div>`;
 
 const V={};
 V.login=(a,q)=>`<div class="card" style="max-width:400px;margin:2rem auto"><h1>Welcome</h1>
  <div class="row"><button class="${a.mode=="reg"?"ghost":""}" data-act="mode" data-m="login">Log in</button><button class="${a.mode=="reg"?"":"ghost"}" data-act="mode" data-m="reg">Register</button></div>
- <form data-form="auth" data-next="${esc(q.next||"#/")}">${a.mode=="reg"?'<label>Name</label><input name="name" required>':""}
- <label>Email</label><input name="email" type="email" required placeholder="jane@example.com"><label>Password</label><input name="pw" type="password" required placeholder="password123">
+ <form data-form="auth" data-next="${esc(q.next||"#/")}" style="margin-top:.6rem">${a.mode=="reg"?'<label>Name</label><input name="name" required maxlength="150">':""}
+ <label>Email</label><input name="email" type="email" required placeholder="jane@example.com"><label>Password</label><input name="pw" type="password" required minlength="8" placeholder="password123">
  <div class="err" id="err"></div><button style="width:100%">${a.mode=="reg"?"Create account":"Log in"}</button></form>
- <p class="mute">Demo accounts: jane@example.com or sam@example.com, password123.</p></div>`;
-V.browse=()=>{const f=catalog;let ps=db.products.filter(p=>p.status=="active"&&(!f.categoryId||p.categoryId==f.categoryId)&&(!f.query||p.title.toLowerCase().includes(f.query.toLowerCase()))&&(f.min===""||p.price>=f.min*100)&&(f.max===""||p.price<=f.max*100));
- ps.sort((a,b)=>f.sort=="lo"?a.price-b.price:f.sort=="hi"?b.price-a.price:b.id-a.id);
- return `<div class="layout"><aside class="card"><h3>Categories</h3><div><a href="#" data-act="cat" data-id="0" ${f.categoryId?"":'style="font-weight:700"'}>All</a></div>
- ${db.categories.map(c=>`<div><a href="#" data-act="cat" data-id="${c.id}" ${f.categoryId==c.id?'style="font-weight:700"':""}>${esc(c.name)}</a></div>`).join("")}
- <h3 style="margin-top:1rem">Price</h3><div class="row"><input id="min" placeholder="Min" value="${f.min}" style="width:70px"><input id="max" placeholder="Max" value="${f.max}" style="width:70px"></div><button class="ghost" style="margin-top:.5rem" data-act="price">Apply filters</button></aside>
- <section><div class="row"><span class="mute">${ps.length} results</span><span class="sp"></span><select id="sort" style="width:auto"><option value="new">Newest</option><option value="lo" ${f.sort=="lo"?"selected":""}>Price: low to high</option><option value="hi" ${f.sort=="hi"?"selected":""}>Price: high to low</option></select></div>
- ${ps.length?`<div class="grid" style="margin-top:.8rem">${ps.map(p=>`<div class="card"><a href="#/product/${p.id}"><div class="pic">${p.pic}</div></a><div style="margin-top:.5rem"><a href="#/product/${p.id}">${esc(p.title)}</a></div><div class="row"><span class="price">${money(p.price)}</span><span class="sp"></span><button class="sm" data-act="add" data-id="${p.id}">Add</button></div><div class="mute">${esc(Api.sellerName(p.sellerId))}</div></div>`).join("")}</div>`:'<p class="card" style="margin-top:.8rem">No products match. Clear a filter or try another search.</p>'}</section></div>`};
-V.product=([id])=>{const p=Api.product(id);if(!p)return"<p>Product not found.</p>";const rv=db.reviews.filter(r=>r.sellerId==p.sellerId).slice(-3);
- return `<p class="mute"><a href="#/">Browse</a> › ${esc(db.categories.find(c=>c.id==p.categoryId)?.name)}</p><div class="two" style="grid-template-columns:1fr 1fr"><div class="pic big">${p.pic}</div><div>
- <h1>${esc(p.title)}</h1><div class="price" style="font-size:1.4rem">${money(p.price)}</div><p class="mute">Sold by ${esc(Api.sellerName(p.sellerId))} · ${ratingTxt(p.sellerId)}</p><p>${p.qty?`In stock: ${p.qty}`:'<span class="chip bad">Sold out</span>'} · Condition: ${esc(p.condition)}</p>
- <p>${db.methods.map(m=>`<span class="chip">${m.name}</span>`).join(" ")}</p><label>Quantity</label><input id="qty" type="number" min="1" max="${p.qty}" value="1" style="width:90px">
+ <p class="mute">Demo accounts: jane@example.com (buyer) · sam@example.com (seller), password123.</p></div>`;
+V.browse=()=>{const f=catalog,base=db.products;let ps=base.filter(p=>(!f.categoryId||p.categoryId==f.categoryId)&&(!f.query||p.title.toLowerCase().includes(f.query.toLowerCase()))&&(f.min===""||p.priceMinor>=f.min*100)&&(f.max===""||p.priceMinor<=f.max*100));
+ ps.sort((a,b)=>f.sort=="lo"?a.priceMinor-b.priceMinor:f.sort=="hi"?b.priceMinor-a.priceMinor:b.id-a.id);
+ const cnt=id=>base.filter(p=>!id||p.categoryId==id).length,dirty=!!(f.categoryId||f.query||f.min!==""||f.max!=="");
+ return `<div class="layout"><aside aria-label="Filters"><h3>Categories</h3><div class="fcats">
+ <a class="fcat ${f.categoryId?"":"on"}" href="#" data-act="cat" data-id="0"><span>All</span><span class="cnt">${cnt(0)}</span></a>
+ ${db.categories.map(c=>`<a class="fcat ${f.categoryId==c.id?"on":""}" href="#" data-act="cat" data-id="${c.id}"><span>${esc(c.name)}</span><span class="cnt">${cnt(c.id)}</span></a>`).join("")}</div>
+ <h3>Price (USD)</h3><div class="prange"><input id="min" inputmode="numeric" placeholder="Min" maxlength="7" value="${esc(f.min)}" aria-label="Minimum price"><span class="dash">–</span><input id="max" inputmode="numeric" placeholder="Max" maxlength="7" value="${esc(f.max)}" aria-label="Maximum price"></div>
+ <div class="fbtns"><button class="sm" data-act="price">Apply</button>${dirty?`<button class="sm ghost" data-act="clearf">Reset</button>`:""}</div>
+ <p class="fhint mute">Tip: press Enter in a field to apply.</p></aside>
+ <section><div class="row"><span class="mute">${ps.length} result${ps.length==1?"":"s"}</span><span class="sp"></span><select id="sort" style="width:auto"><option value="new">Newest</option><option value="lo" ${f.sort=="lo"?"selected":""}>Price: low to high</option><option value="hi" ${f.sort=="hi"?"selected":""}>Price: high to low</option></select></div>
+ ${ps.length?`<div class="grid" style="margin-top:.8rem">${ps.map(p=>`<div class="card"><a href="#/product/${p.id}"><div class="pic">${pic(p)}</div></a><div style="margin-top:.5rem"><a href="#/product/${p.id}">${esc(p.title)}</a></div><div class="row"><span class="price">${money(p.priceMinor)}</span><span class="sp"></span><button class="sm" data-act="add" data-id="${p.id}">Add</button></div><div class="mute">Sold by ${esc(p.sellerName??full(p.sellerId)?.sellerName??"Seller")}</div></div>`).join("")}</div>`:`<div class="card empty"><h2>Nothing matches just yet</h2><p class="mute">Widen the price range, clear the search, or try another category.</p><button class="sm ghost" data-act="clearf">Clear all filters</button></div>`}</section></div>`};
+V.product=async([id])=>{const d=await api("/products/"+encodeURIComponent(id));const p=d.product;if(!p)return"<p>Product not found.</p>";
+ const rv=d.reviews??[],rate=d.sellerRating?`${stars(d.sellerRating.avg)} ${d.sellerRating.avg.toFixed(1)} (${d.sellerRating.n})`:"No reviews yet";
+ return `<p class="mute"><a href="#/">Browse</a> › ${esc(p.categoryName)}</p><div class="two" style="grid-template-columns:1fr 1fr"><div class="pic big">${pic(p)}</div><div>
+ <h1>${esc(p.title)}</h1><div class="price" style="font-size:1.4rem">${money(p.priceMinor)}</div><p class="mute">Sold by ${esc(p.sellerName)} · ${rate}</p><p>${p.qty?`In stock: ${p.qty}`:'<span class="chip bad">Sold out</span>'}</p>
+ <p>${db.methods.map(m=>`<span class="chip">${esc(m.name)}</span>`).join(" ")}</p><label>Quantity</label><input id="qty" type="number" min="1" max="${p.qty}" value="1" style="width:90px">
  <div class="row" style="margin-top:.8rem"><button data-act="add" data-id="${p.id}" data-qty ${p.qty?"":"disabled"}>Add to cart</button><button class="ghost" data-act="buy" data-id="${p.id}" ${p.qty?"":"disabled"}>Buy now</button></div>
- <h3 style="margin-top:1.2rem">Description</h3><p>${esc(p.description)}</p><h3>Seller reviews</h3>${rv.map(r=>`<p><span style="color:#f5b301">${stars(r.rating)}</span> ${esc(r.comment)}</p>`).join("")||'<p class="mute">No reviews yet.</p>'}</div></div>`};
+ <h3 style="margin-top:1.2rem">Description</h3><p>${esc(p.description)}</p><h3>Seller reviews</h3>${rv.map(r=>`<p><span style="color:#f5b301">${stars(r.rating)}</span> ${esc(r.comment||"")}${r.buyerName?` <span class="mute">— ${esc(r.buyerName)}</span>`:""}</p>`).join("")||'<p class="mute">No reviews yet.</p>'}</div></div>`};
 V.cart=()=>{const g=cart.groupBySeller();if(!cart.items.length)return'<div class="card"><h1>Your cart is empty</h1><a href="#/">Find something to buy</a></div>';
- return `<h1>Shopping cart (${cart.count()} items)</h1><div class="two"><div>${Object.entries(g).map(([s,its])=>`<div class="group">Seller: ${esc(Api.sellerName(s))}</div>${its.map(i=>`<div class="card row" style="margin-bottom:.4rem"><span style="font-size:2rem">${i.pic}</span><span class="sp"><a href="#/product/${i.productId}">${esc(i.titleSnapshot)}</a><br><span class="mute">${money(i.unitPriceMinor)} each</span></span><input type="number" min="1" style="width:70px" value="${i.quantity}" data-act="qty" data-id="${i.productId}"><span class="price">${money(i.lineTotalMinor())}</span><button class="sm ghost" data-act="rm" data-id="${i.productId}" aria-label="Remove">✕</button></div>`).join("")}`).join("")}</div>
+ return `<h1>Shopping cart (${cart.count()} items)</h1><div class="two"><div>${Object.entries(g).map(([s,its])=>`<div class="group">Seller: ${esc(full(s)?.sellerName??"Seller")}</div>${its.map(i=>`<div class="card row" style="margin-bottom:.4rem"><span style="font-size:2rem">${i.pic}</span><span class="sp"><a href="#/product/${i.productId}">${esc(i.titleSnapshot)}</a><br><span class="mute">${money(i.unitPriceMinor)} each</span></span><input type="number" min="1" style="width:70px" value="${i.quantity}" data-act="qty" data-id="${i.productId}"><span class="price">${money(i.lineTotalMinor())}</span><button class="sm ghost" data-act="rm" data-id="${i.productId}" aria-label="Remove">✕</button></div>`).join("")}`).join("")}</div>
  <div class="card"><h2>Order summary</h2><div class="row"><span>Subtotal</span><span class="sp"></span><span>${money(cart.subtotalMinor())}</span></div><p class="mute">Items ship separately per seller. The final total is confirmed by the server.</p><a class="btn" style="display:block;text-align:center" href="#/checkout">Checkout</a></div></div>`};
 V.checkout=()=>{if(!cart.items.length)return'<p>Your cart is empty.</p>';const a=checkout.address,g=cart.groupBySeller();
  return `<h1>Checkout</h1><form data-form="checkout" class="two"><div class="card"><h2>Delivery address</h2><div class="two" style="grid-template-columns:1fr 1fr"><div><label>Full name</label><input name="name" required value="${esc(a.name||auth.user.name)}"></div><div><label>Phone</label><input name="phone" required value="${esc(a.phone)}"></div></div>
  <label>Street address</label><input name="street" required value="${esc(a.street)}"><div class="two" style="grid-template-columns:1fr 1fr"><div><label>City</label><input name="city" required value="${esc(a.city)}"></div><div><label>Postal code</label><input name="zip" required value="${esc(a.zip)}"></div></div>
- <h2 style="margin-top:1rem">Exchange method (per seller)</h2>${Object.keys(g).map(s=>`<div class="row"><strong class="sp">${esc(Api.sellerName(s))}</strong><select name="m${s}" style="width:auto">${db.methods.map(m=>`<option value="${m.id}">${m.name}</option>`).join("")}</select></div>`).join("")}</div>
+ <h2 style="margin-top:1rem">Exchange method (per seller)</h2>${Object.keys(g).map(s=>`<div class="row"><strong class="sp">${esc(full(s)?.sellerName??"Seller")}</strong><select name="m${s}" style="width:auto">${db.methods.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("")}</select></div>`).join("")}</div>
  <div class="card"><h2>Order summary</h2><p>${cart.count()} items, ${Object.keys(g).length} seller(s)</p><div class="row"><strong>Total</strong><span class="sp"></span><strong>${money(cart.subtotalMinor())}</strong></div><div class="err" id="err"></div><button style="width:100%">Place order and pay</button><p class="mute">You will be redirected to the payment provider.</p></div></form>`};
-V.pay=([id])=>{const o=Api.order(id);if(!o)return"<p>Order not found.</p>";return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Simulated provider page for order #${o.id}.</p><p class="price" style="font-size:1.4rem">${money(o.totalMinor)}</p><div class="row"><button data-act="pay" data-id="${o.id}" data-s="captured">Pay now</button><button class="ghost" data-act="pay" data-id="${o.id}" data-s="failed">Cancel payment</button></div></div>`};
-V.result=([id])=>{const o=Api.order(id);if(!o)return"<p>Order not found.</p>";
- if(o.payment=="pending"){setTimeout(()=>route(),700);return'<div class="card" style="max-width:480px;margin:2rem auto"><h1>Confirming your payment…</h1><p class="mute">Waiting for the payment provider. This page updates by itself.</p></div>'}
- if(o.payment=="failed")return`<div class="card" style="max-width:480px;margin:2rem auto"><h1>Payment did not go through</h1><p>Your order was not charged. Try again or change your cart.</p><div class="row"><a class="btn" href="#/pay/${o.id}">Retry payment</a><a href="#/cart">Back to cart</a></div></div>`;
- return `<div class="card" style="max-width:520px;margin:2rem auto"><h1 class="ok">Order placed</h1><p>Order #${o.id}: payment confirmed by the provider.</p>${o.sellerOrders.map(s=>`<div class="row"><span class="sp">${esc(Api.sellerName(s.sellerId))} · ${s.items.length} item(s)</span><span class="chip">${LABEL[s.fulfillment]}</span></div>`).join("")}<div class="row" style="margin-top:1rem"><a class="btn" href="#/orders">View my orders</a><a href="#/">Keep shopping</a></div></div>`};
-const stepper=s=>{const i=STEPS.indexOf(s.fulfillment);return i<0?`<span class="chip bad">${LABEL[s.fulfillment]}</span>`:`<div class="steps">${STEPS.map((x,k)=>`${k?'<span class="bar"></span>':""}<span class="dot ${k<=i?"on":""}" title="${LABEL[x]}"></span>`).join("")}<span class="chip" style="margin-left:.4rem">${LABEL[s.fulfillment]}</span></div>`};
-V.orders=()=>{const os=db.orders.filter(o=>o.buyerId==auth.id&&o.payment!="pending").reverse();if(!os.length)return'<div class="card"><h1>No orders yet</h1><a href="#/">Browse products</a></div>';
- return `<h1>My orders</h1>${os.map(o=>`<div class="card" style="margin-bottom:1rem"><div class="row"><strong>Order #${o.id} · ${new Date(o.orderedAt).toLocaleDateString()}</strong><span class="sp"></span><strong>${money(o.totalMinor)}</strong></div>${o.payment=="failed"?'<span class="chip bad">Payment failed</span>':o.sellerOrders.map(s=>`<div class="row" style="padding:.5rem 0;border-top:1px solid var(--line)"><span style="min-width:140px">${esc(Api.sellerName(s.sellerId))} · ${s.items.length} item(s)${s.tracking?`<br><span class="mute">Tracking: ${esc(s.tracking)}</span>`:""}</span>${stepper(s)}<span class="sp"></span>
- ${s.fulfillment=="shipped"?`<button class="sm" data-act="receive" data-id="${s.id}">Confirm receipt</button>`:""}${s.fulfillment=="completed"?(db.reviews.some(r=>r.sellerOrderId==s.id)?'<span class="chip ok">Reviewed</span>':`<button class="sm" data-act="review" data-id="${s.id}">Leave review</button>`)+(s.refund?'<span class="chip warn">Refund requested</span>':`<button class="sm ghost" data-act="refund" data-id="${s.id}">Request refund</button>`):""}</div>`).join("")}</div>`).join("")}`};
-V.seller=()=>{const u=auth.user;if(!auth.hasRole("seller"))return`<div class="card"><h1>Become a seller</h1><p>List items and get paid through the payment provider.</p><button data-act="beseller">Start selling</button></div>`;
- const mine=db.products.filter(p=>p.sellerId==u.id),sos=[];db.orders.forEach(o=>o.sellerOrders.filter(s=>s.sellerId==u.id&&s.fulfillment!="awaiting_payment").forEach(s=>sos.push({o,s})));
- const act=s=>({new:`<button class="sm" data-act="so" data-do="confirmed" data-id="${s.id}">Confirm</button> <button class="sm ghost" data-act="so" data-do="declined" data-id="${s.id}">Decline</button>`,confirmed:`<button class="sm" data-act="ship" data-id="${s.id}">Mark shipped</button>`,completed:s.release=="requested"?'<span class="chip warn">Release requested</span>':`<button class="sm" data-act="release" data-id="${s.id}">Request release</button>`}[s.fulfillment]||"");
- return `<h1>Seller dashboard</h1><div class="grid" style="margin-bottom:1rem"><div class="card"><div class="mute">Active listings</div><h2>${mine.filter(p=>p.status=="active").length}</h2></div><div class="card"><div class="mute">To ship</div><h2>${sos.filter(x=>["new","confirmed"].includes(x.s.fulfillment)).length}</h2></div><div class="card"><div class="mute">Awaiting release</div><h2>${money(sos.filter(x=>x.s.fulfillment=="completed"&&x.s.release=="none").reduce((a,x)=>a+x.s.items.reduce((b,i)=>b+i.qty*i.unit,0),0))}</h2></div></div>
- <div class="card row" style="margin-bottom:1rem"><span class="sp">${u.payouts?'<span class="chip ok">Payment account connected</span> Payouts enabled':"<strong>Connect a payment account</strong> to receive payouts."}</span>${u.payouts?"":'<button class="sm" data-act="onboard">Connect payment account</button>'}</div>
- <h2>Incoming orders</h2><div class="card" style="overflow-x:auto;margin-bottom:1rem"><table><tr><th>Order</th><th>Buyer</th><th>Items</th><th>Status</th><th></th></tr>${sos.map(({o,s})=>`<tr><td>#${s.id}</td><td>${esc(Api.user(o.buyerId)?.name)}</td><td>${s.items.map(i=>`${i.qty}× ${esc(i.title)}`).join(", ")}</td><td><span class="chip">${LABEL[s.fulfillment]}</span></td><td>${act(s)}</td></tr>`).join("")||'<tr><td colspan="5" class="mute">No orders yet.</td></tr>'}</table></div>
- <div class="row"><h2 class="sp">My listings</h2><a class="btn" href="#/seller/edit/new">New listing</a></div><div class="card" style="overflow-x:auto"><table><tr><th></th><th>Title</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${mine.map(p=>`<tr><td>${p.pic}</td><td>${esc(p.title)}</td><td>${money(p.price)}</td><td>${p.qty}</td><td><span class="chip">${p.status}</span></td><td><a href="#/seller/edit/${p.id}">Edit</a></td></tr>`).join("")}</table></div>`};
-V.edit=([id])=>{const p=id=="new"?{title:"",categoryId:1,price:0,qty:1,condition:"Good",description:"",pic:"📦",status:"active"}:Api.product(id);
- return `<h1>${id=="new"?"Create listing":"Edit listing"}</h1><form data-form="listing" data-id="${id}" class="card" style="max-width:640px"><label>Title</label><input name="title" required value="${esc(p.title)}">
- <div class="two" style="grid-template-columns:1fr 1fr"><div><label>Category</label><select name="categoryId">${db.categories.map(c=>`<option value="${c.id}" ${c.id==p.categoryId?"selected":""}>${c.name}</option>`).join("")}</select></div><div><label>Price (USD)</label><input name="price" type="number" step="0.01" min="0.01" required value="${(p.price/100).toFixed(2)}"></div>
- <div><label>Quantity</label><input name="qty" type="number" min="0" required value="${p.qty}"></div><div><label>Condition</label><select name="condition">${["New","Like new","Good","Fair"].map(c=>`<option ${c==p.condition?"selected":""}>${c}</option>`).join("")}</select></div></div>
- <label>Description</label><textarea name="description" rows="4">${esc(p.description)}</textarea><label>Photo (emoji placeholder)</label><input name="pic" maxlength="4" value="${esc(p.pic)}" style="width:90px">
- <label>Status</label><select name="status"><option value="draft" ${p.status=="draft"?"selected":""}>Draft</option><option value="active" ${p.status=="active"?"selected":""}>Active</option></select><div class="row" style="margin-top:1rem"><button>${id=="new"?"Publish":"Save changes"}</button><a href="#/seller">Cancel</a></div></form>`};
+V.pay=async([id])=>{const {order:o}=await api("/order/"+encodeURIComponent(id));
+ if(o.status!="pending")return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Order #${o.id} was already processed (${LABEL[o.status]??o.status}).</p><div class="row"><a class="btn" href="#/orders">View my orders</a></div></div>`;
+ return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Simulated provider page for order #${o.id}.</p>${o.delivery?.street?`<p class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</p>`:""}<p class="price" style="font-size:1.4rem">${money(o.totalMinor)}</p><div class="row"><button data-act="pay" data-id="${o.id}" data-s="captured">Pay now</button><button class="ghost" data-act="pay" data-id="${o.id}" data-s="failed">Cancel payment</button></div><p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel order instead</button></p></div>`};
+V.result=async([id])=>{const {order:o}=await api("/order/"+encodeURIComponent(id));
+ if(o.status=="pending"){setTimeout(()=>route(),700);return'<div class="card" style="max-width:480px;margin:2rem auto"><h1>Confirming your payment…</h1><p class="mute">Waiting for the payment provider. This page updates by itself.</p></div>'}
+ if(o.status=="cancelled")return`<div class="card" style="max-width:480px;margin:2rem auto"><h1>Payment did not go through</h1><p>Your order was not charged. Try again or change your cart.</p><div class="row"><a class="btn" href="#/pay/${o.id}">Retry payment</a><a href="#/cart">Back to cart</a></div></div>`;
+ return `<div class="card" style="max-width:520px;margin:2rem auto"><h1 class="ok">Order placed</h1><p>Order #${o.id}: payment confirmed by the provider.</p>${o.sellerOrders.map(s=>`<div class="row"><span class="sp">${esc(s.sellerName)} · ${s.items.length} item(s)</span><span class="chip">${LABEL[s.fulfillment]??s.fulfillment}</span></div>`).join("")}<div class="row" style="margin-top:1rem"><a class="btn" href="#/orders">View my orders</a><a href="#/">Keep shopping</a></div></div>`};
+const stepper=s=>{const i=STEPS.indexOf(s.fulfillment);return i<0?`<span class="chip bad">${LABEL[s.fulfillment]??s.fulfillment}</span>`:`<div class="steps">${STEPS.map((x,k)=>`${k?'<span class="bar"></span>':""}<span class="dot ${k<=i?"on":""}" title="${LABEL[x]}"></span>`).join("")}<span class="chip" style="margin-left:.4rem">${LABEL[s.fulfillment]??s.fulfillment}</span></div>`};
+V.orders=async()=>{const os=(await api("/orders")).orders;
+ if(!os.length)return'<div class="card"><h1>No orders yet</h1><a href="#/">Browse products</a></div>';
+ return `<h1>My orders</h1>${os.map(o=>`<div class="card" style="margin-bottom:1rem"><div class="row"><strong>Order #${o.id} · ${new Date(o.orderedAt).toLocaleDateString()}</strong><span class="sp"></span><strong>${money(o.totalMinor)}</strong></div>${o.delivery?.street?`<div class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</div>`:""}${o.status=="pending"?`<div class="row" style="padding:.55rem 0;border-top:1px solid var(--line)"><span class="chip warn">Awaiting payment</span><span class="sp"></span><a class="btn ghost" href="#/pay/${o.id}">Pay now</a><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel</button></div>`:o.status=="cancelled"?'<span class="chip bad">Payment failed</span>':o.sellerOrders.map(s=>`<div class="row" style="padding:.5rem 0;border-top:1px solid var(--line)"><span style="min-width:140px">${esc(s.sellerName)} · ${s.items.length} item(s)${s.tracking?`<br><span class="mute">Tracking: ${esc(s.tracking)}</span>`:""}</span>${stepper(s)}<span class="sp"></span>
+ ${s.fulfillment=="shipped"?`<button class="sm" data-act="receive" data-id="${s.id}">Confirm receipt</button>`:""}${s.fulfillment=="completed"?(s.reviewed?'<span class="chip ok">Reviewed</span>':`<button class="sm" data-act="review" data-id="${s.id}">Leave review</button>`)+(s.release!="not_eligible"?'<span class="chip warn">Refund requested</span>':`<button class="sm ghost" data-act="refund" data-id="${s.id}">Request refund</button>`):""}</div>`).join("")}</div>`).join("")}`};
+V.seller=async()=>{const u=auth.user;if(!u)return "<p>Sign in first.</p>";
+ if(!auth.hasRole("seller"))return `<div class="card"><h1>Become a seller</h1><p>List items in a few clicks; orders arrive here as soon as buyers check out.</p><button data-act="beseller">Start selling</button></div>`;
+ const [L,S,ST]=await Promise.all([api("/seller/listings"),api("/seller/orders"),api("/seller/stats")]);
+ const mine=L.listings,sos=S.orders,st=ST,maxDay=Math.max(1,...st.daily.map(d=>d.revenueMinor));
+ const btnFor=s=>({pending:`<button class="sm" data-act="so" data-do="seller:confirm" data-id="${s.id}">Confirm</button> <button class="sm ghost" data-act="so" data-do="seller:decline" data-id="${s.id}">Decline</button>`,
+  confirmed:`<button class="sm" data-act="ship" data-id="${s.id}">Mark shipped</button>`,
+  shipped:`<span class="chip">Shipped${s.tracking?`: ${esc(s.tracking)}`:""}</span>`,
+  completed:completed.includes(s)?(s.release!="not_eligible"?'<span class="chip warn">Refund requested</span>':'<span class="chip ok">Order complete</span>'):""}[s.fulfillment]??"");
+ return `<h1>Seller dashboard</h1><div class="row" style="margin-bottom:1.2rem"><a class="btn" href="#/seller/edit/new">New listing</a></div>
+ <div class="row" style="margin-bottom:1.2rem"><div class="card"><div class="mute">Completed revenue</div><h2>${money(st.revenueMinor)}</h2></div><div class="card"><div class="mute">Units sold</div><h2>${st.unitsSold}</h2></div><div class="card"><div class="mute">Open orders</div><h2>${st.openOrders}</h2></div><div class="card"><div class="mute">Awaiting you</div><h2>${st.awaitingAction}</h2></div><div class="card"><div class="mute">Active listings</div><h2>${mine.filter(p=>p.status=="active").length}</h2></div></div>
+ <div class="card" style="margin-bottom:1rem"><div class="row"><h3 class="sp">Completed sales · last 14 days</h3><span class="mute">${st.completedOrders} order(s)</span></div><div class="bars">${st.daily.map(d=>`<div class="b" style="height:${Math.max(3,Math.round(d.revenueMinor/maxDay*90))}%" title="${d.day}: ${money(d.revenueMinor)}"></div>`).join("")}</div><div class="row mute" style="justify-content:space-between;margin-top:.3rem"><span>${st.daily[0]?.day??""}</span><span>${st.daily[st.daily.length-1]?.day??""}</span></div>
+ ${st.top.length?`<h3 style="margin-top:1rem">Top listings · 30 days</h3>${st.top.map(t=>`<div class="row" style="border-top:1px solid var(--line-2);padding:.35rem 0"><span class="sp">${esc(t.title)}</span><span class="mute">${t.units} sold</span><span class="price">${money(t.revenueMinor)}</span></div>`).join("")}`:'<p class="mute">No completed sales yet.</p>'}</div>
+ <h2>Incoming orders</h2><div class="card" style="overflow-x:auto;margin-bottom:1rem"><table><tr><th>Seller order</th><th>Buyer</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr>
+ ${sos.map(s=>`<tr><td>#${s.id}</td><td>${esc(s.buyerName)}${s.delivery?.street?`<br><span class="mute">${esc(s.delivery.street)}, ${esc(s.delivery.city)}</span>`:""}</td><td>${s.items.map(i=>`${i.qty}× ${esc(i.title)}`).join(", ")}</td><td>${money(s.totalMinor)}</td><td><span class="chip ${s.fulfillment=="cancelled"?"bad":""}">${LABEL[s.fulfillment]??s.fulfillment}</span></td><td>${btnFor(s)}</td></tr>`).join("")||'<tr><td colspan="6" class="mute">No orders yet.</td></tr>'}</table></div>
+ <div class="row"><h2 class="sp">My listings</h2></div><div class="card" style="overflow-x:auto"><table><tr><th></th><th>Title</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>
+ ${mine.map(p=>`<tr><td style="font-size:1.6rem">${pic(p)}</td><td>${esc(p.title)}</td><td>${money(p.priceMinor)}</td><td>${p.qty}</td><td><span class="chip ${p.status=="active"?"ok":""}">${esc(p.status)}</span></td><td><a href="#/seller/edit/${p.id}">Edit</a></td></tr>`).join("")||'<tr><td colspan="6" class="mute">No listings yet — create your first one.</td></tr>'}</table></div>`};
+V.edit=async([id])=>{const isNew=id=="new";
+ let p={title:"",categoryId:db.categories[0]?.id??1,priceMinor:2000,qty:1,description:"",status:"active"};
+ if(!isNew){const l=(await api("/seller/listings")).listings.find(x=>String(x.id)===String(id));
+  if(!l)return `<div class="card"><h1>Listing not found</h1><a href="#/seller">Back to my listings</a></div>`;p=l}
+ return `<h1>${isNew?"Create listing":"Edit listing"}</h1><form data-form="listing" data-id="${id}" class="card" style="max-width:640px"><label>Title</label><input name="title" required maxlength="200" value="${esc(p.title)}">
+ <div class="two" style="grid-template-columns:1fr 1fr"><div><label>Category</label><select name="categoryId">${db.categories.map(c=>`<option value="${c.id}" ${c.id==p.categoryId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Price (USD)</label><input name="price" type="number" step="0.01" min="0.01" required value="${(p.priceMinor/100).toFixed(2)}"></div></div>
+ <div class="two" style="grid-template-columns:1fr 1fr"><div><label>Quantity</label><input name="qty" type="number" min="0" required value="${p.qty}"></div><div><label>Status</label><select name="status"><option value="draft" ${p.status=="draft"?"selected":""}>Draft</option><option value="active" ${p.status=="active"?"selected":""}>Active</option><option value="paused" ${p.status=="paused"?"selected":""}>Paused</option></select></div></div>
+ <label>Description</label><textarea name="description" rows="4">${esc(p.description)}</textarea><div class="row" style="margin-top:1rem"><button>${isNew?"Publish":"Save changes"}</button><a href="#/seller">Cancel</a></div></form>`};
 
 /* ===== Click Actions and Event Listeners ===== */
 const A={
- logout(){auth.logout();location.hash="#/"},
+ async logout(){await auth.logout();navbar();route()},
  mode(e){state.mode=e.dataset.m;route()},
  cat(e){catalog.categoryId=+e.dataset.id;route()},
  price(){catalog.min=$("#min").value;catalog.max=$("#max").value;route()},
- add(e){const q=e.hasAttribute("data-qty")?+$("#qty").value:1;cart.addItem(+e.dataset.id,q);navbar();toast("Added to cart")},
- buy(e){cart.addItem(+e.dataset.id,+$("#qty").value||1);location.hash="#/cart"},
+ clearf(){catalog.query="";catalog.categoryId=0;catalog.min="";catalog.max="";route()},
+ add(e){const q=e.hasAttribute("data-qty")?+$("#qty").value:1;cart.addItem(+e.dataset.id,q);navbar();if(cart.items.some(i=>i.productId==+e.dataset.id))toast("Added to cart")},
+ buy(e){cart.addItem(+e.dataset.id,+$("#qty").value||1);if(cart.items.length)location.hash="#/cart"},
  qty(e){cart.updateQuantity(+e.dataset.id,e.value);route()},
  rm(e){cart.removeItem(+e.dataset.id);route()},
- pay(e){const id=+e.dataset.id,st=e.dataset.s;location.hash="#/result/"+id;setTimeout(()=>{Api.webhook(id,st);route()},1500);if(st=="captured")cart.clear()},
- receive(e){Api.sellerOrder(+e.dataset.id).s.fulfillment="completed";save();route()},
- refund(e){Api.sellerOrder(+e.dataset.id).s.refund=true;save();route();toast("Refund requested")},
+ cancelOrder(e){if(!confirm("Cancel this unpaid order?"))return;call("POST",`/order/${e.dataset.id}/cancel`).then(()=>{toast("Order cancelled");route()}).catch(x=>toast(x.message))},
+ pay(e){const id=+e.dataset.id,st=e.dataset.s;if(st=="captured")cart.clear();navbar();location.hash="#/result/"+id;
+  call("POST",`/order/${id}/pay`,{result:st}).then(()=>route()).catch(x=>toast(x.message))},
+ receive(e){call("POST",`/seller-orders/${e.dataset.id}/status`,{action:"buyer:receive"}).then(()=>route()).catch(x=>toast(x.message))},
+ refund(e){call("POST",`/seller-orders/${e.dataset.id}/refund`).then(()=>{route();toast("Refund requested")}).catch(x=>toast(x.message))},
  review(e){const id=+e.dataset.id;let r=5;const m=document.createElement("div");m.className="modal";
   const draw=()=>{m.innerHTML=`<div class="card"><h2>Review your seller</h2><div class="stars">${[1,2,3,4,5].map(n=>`<button data-r="${n}" aria-label="${n} stars">${n<=r?"★":"☆"}</button>`).join("")}</div><label>Comment</label><textarea id="rc" rows="4"></textarea><div class="row" style="margin-top:.8rem"><button data-x="ok">Submit review</button><button class="ghost" data-x="no">Cancel</button></div><p class="mute">One review per completed order.</p></div>`};
-  draw();m.onclick=ev=>{const t=ev.target.closest("button");if(!t)return;if(t.dataset.r){r=+t.dataset.r;const c=$("#rc").value;draw();$("#rc").value=c}else{if(t.dataset.x=="ok")Api.review(id,auth.id,r,$("#rc").value||"");m.remove();route()}};document.body.append(m)},
- so(e){Api.sellerOrder(+e.dataset.id).s.fulfillment=e.dataset.do;save();route()},
- ship(e){const t=prompt("Tracking number (optional)");if(t===null)return;const s=Api.sellerOrder(+e.dataset.id).s;s.tracking=t;s.fulfillment="shipped";save();route()},
- release(e){Api.sellerOrder(+e.dataset.id).s.release="requested";save();route()},
- beseller(){auth.user.roles.push("seller");save();navbar();route()},
- onboard(){auth.user.payouts=true;save();route();toast("Payment account connected")}
+  draw();m.onclick=ev=>{const t=ev.target.closest("button");if(!t)return;
+   if(t.dataset.r){r=+t.dataset.r;const c=$("#rc").value;draw();$("#rc").value=c}
+   else if(t.dataset.x=="ok"){call("POST","/reviews",{sellerOrderId:id,rating:r,comment:($("#rc")?.value??"")}).then(()=>{m.remove();route()}).catch(x=>toast(x.message))}
+   else m.remove()};document.body.append(m)},
+ so(e){call("POST",`/seller-orders/${e.dataset.id}/status`,{action:e.dataset.do}).then(()=>route()).catch(x=>toast(x.message))},
+ ship(e){const t=prompt("Tracking number (optional)");if(t===null)return;
+  call("POST",`/seller-orders/${e.dataset.id}/status`,{action:"seller:ship",tracking:t}).then(()=>route()).catch(x=>toast(x.message))},
+ beseller(){auth.becomeSeller().then(()=>{navbar();route();toast("You can now list items for sale")}).catch(x=>toast(x.message))}
 };
 const state={mode:"login"};
 document.addEventListener("click",ev=>{const e=ev.target.closest("[data-act]");if(!e||e.tagName=="INPUT")return;ev.preventDefault();A[e.dataset.act]?.(e)});
 document.addEventListener("change",ev=>{if(ev.target.dataset.act=="qty")A.qty(ev.target);if(ev.target.id=="sort"){catalog.sort=ev.target.value;route()}});
-document.addEventListener("keydown",ev=>{if(ev.target.id=="q"&&ev.key=="Enter"){catalog.query=ev.target.value;location.hash="#/";route()}});
-document.addEventListener("submit",ev=>{const f=ev.target,k=f.dataset.form;if(!k)return;ev.preventDefault();const d=Object.fromEntries(new FormData(f)),err=$("#err");
- try{
-  if(k=="auth"){state.mode=="reg"?auth.register(d.name,d.email,d.pw):auth.login(d.email,d.pw);navbar();location.hash=decodeURIComponent(f.dataset.next)}
-  if(k=="checkout"){checkout.address={name:d.name,phone:d.phone,street:d.street,city:d.city,zip:d.zip};store.set("mkt_addr",checkout.address);
-   const m={};Object.keys(cart.groupBySeller()).forEach(s=>m[s]=d["m"+s]);const o=Api.placeOrder(auth.user,cart,checkout.address,m);location.hash="#/pay/"+o.id}
-  if(k=="listing"){const p=f.dataset.id=="new"?{id:++db.seq,sellerId:auth.id,currency:"USD"}:Api.product(f.dataset.id);
-   Object.assign(p,{title:d.title.trim(),categoryId:+d.categoryId,price:Math.round(d.price*100),qty:+d.qty,condition:d.condition,description:d.description,pic:d.pic||"📦",status:d.status});if(!db.products.includes(p))db.products.push(p);save();location.hash="#/seller";toast("Listing saved")}
- }catch(x){if(err)err.textContent=x.message}});
+document.addEventListener("keydown",ev=>{const id=ev.target.id;if(ev.key!="Enter")return;
+ if(id=="q"){catalog.query=ev.target.value;if(location.hash!="#/")location.hash="#/";route()}
+ if(id=="min"||id=="max")A.price()});
+document.addEventListener("submit",ev=>{const f=ev.target,k=f.dataset.form;if(!k)return;ev.preventDefault();
+ const d=Object.fromEntries(new FormData(f));const errs=f.querySelectorAll(".err"),err=errs[errs.length-1]||document.getElementById("err");
+ (async()=>{
+  if(k=="auth"){state.mode=="reg"?await auth.register(d.name,d.email,d.pw):await auth.login(d.email,d.pw);navbar();location.hash=decodeURIComponent(f.dataset.next)}
+  else if(k=="checkout"){checkout.address={name:d.name,phone:d.phone,street:d.street,city:d.city,zip:d.zip};store.set("mkt_addr",checkout.address);
+   const m={};Object.keys(cart.groupBySeller()).forEach(s=>m[s]=+d["m"+s]);
+   const r=await call("POST","/checkout",{items:cart.items.map(i=>({productId:i.productId,quantity:i.quantity})),address:checkout.address,methods:m});
+   location.hash="#/pay/"+r.order}
+  else if(k=="listing"){const body={title:d.title.trim(),categoryId:+d.categoryId,priceMinor:Math.round(d.price*100),qty:+d.qty,description:d.description,status:d.status};
+   f.dataset.id=="new"?await call("POST","/seller/listings",body):await call("PUT","/seller/listings/"+f.dataset.id,body);
+   location.hash="#/seller";toast("Listing saved")}
+ })().catch(x=>{if(err)err.textContent=x.message;else toast(x.message)})});
 
 /* ===== Client Router Routing Engine ===== */
-function route(){const [path,qs]=(location.hash.slice(1)||"/").split("?"),q=Object.fromEntries(new URLSearchParams(qs||"")),seg=path.split("/").filter(Boolean);
+async function route(){const [path,qs]=(location.hash.slice(1)||"/").split("?"),q=Object.fromEntries(new URLSearchParams(qs||"")),seg=path.split("/").filter(Boolean);
  const authed=["cart","checkout","orders","seller","pay","result"];let name=seg[0]||"browse",args=seg.slice(1);
  if(name=="seller"&&seg[1]=="edit"){name="edit";args=seg.slice(2)}
- if(authed.includes(name)&&name!="cart"&&needLogin())return;
- if(["seller","edit"].includes(name)&&!auth.hasRole("seller")&&name=="edit"){location.hash="#/seller";return}
- navbar();$("#app").innerHTML=(V[name]||(()=>"<p>Page not found.</p>"))(name=="login"?state:args,q);if(name=="login")$("#app").innerHTML=V.login(state,q);window.scrollTo(0,0)}
-addEventListener("hashchange",route);route();
+ if(authed.includes(name)&&needLogin())return;
+ if(name=="edit"&&!auth.hasRole("seller")){location.hash="#/seller";return}
+ navbar();$("#app").innerHTML='<div class="mute" style="opacity:.6">Loading…</div>';
+ try{$("#app").innerHTML=await (V[name]||(()=>"<p>Page not found.</p>"))(name=="login"?state:args,q)}
+ catch(x){$("#app").innerHTML=errBox(x.message)}
+ window.scrollTo(0,0)}
+
+/* ===== Boot: pull a fresh snapshot from the Postgres-backed API ===== */
+(async function boot(){
+ try{const d=await api("/bootstrap");db.user=d.user;db.categories=d.categories;db.methods=d.methods;db.products=d.products;
+  localStorage.removeItem("mkt_db");localStorage.removeItem("mkt_uid")} // legacy demo stores are gone for good
+ catch(x){toast("The market is offline — "+x.message)}
+ route()})();
+addEventListener("hashchange",route);
 </script>
 </body>
 </html>

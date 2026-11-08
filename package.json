@@ -7,7 +7,8 @@
     "migrate": "node --env-file=.env dist/src/migrate.js",
     "start": "node --env-file=.env dist/src/server.js",
     "dev": "tsc && node --env-file=.env dist/src/server.js",
-    "admin:seed": "node --env-file=.env dist/src/scripts/seed-admin.js"
+    "admin:seed": "node --env-file=.env dist/src/scripts/seed-admin.js",
+    "demo:seed": "node --env-file=.env dist/src/scripts/seed-demo.js"
   },
   "dependencies": {
     "@neon/config": "^1.9.3",

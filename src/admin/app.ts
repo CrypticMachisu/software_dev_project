@@ -27,9 +27,9 @@ adminApp.use(
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
-        "style-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
         "script-src": ["'self'", "https://cdn.jsdelivr.net"],
-        "font-src": ["'self'", "https://cdnjs.cloudflare.com"],
+        "font-src": ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
         "upgrade-insecure-requests": null,
       },
     },
