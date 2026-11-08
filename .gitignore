@@ -2,3 +2,5 @@
 .neon
 node_modules/
 dist/
+
+.worktrees/
