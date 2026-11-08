@@ -128,11 +128,12 @@ aside .fhint{margin-top:.55rem;font-size:.76rem}
   transition:transform .35s cubic-bezier(.32,.72,0,1),box-shadow .3s .03s cubic-bezier(.32,.72,0,1)}
 .grid>.card a:hover{text-decoration:none}
 @media(hover:hover){.grid>.card:hover a{text-decoration:underline}}
-.pic{position:relative;display:grid;place-items:center;height:150px;font-size:3.4rem;
-  border-radius:calc(var(--r-lg) - 6px);overflow:hidden;background:linear-gradient(150deg,var(--acc-soft),var(--chip))}
-.pic-fallback{position:relative;z-index:0}
-.pic img{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover;background:var(--chip)}
-.pic.big{height:320px;font-size:6.8rem;border-radius:var(--r-lg)}
+.media{position:relative;aspect-ratio:4/3;overflow:hidden;border-radius:calc(var(--r-lg) - 6px);background:var(--chip)}
+.media.big{aspect-ratio:4/5;border-radius:var(--r-lg)}
+.media svg{position:absolute;inset:0;width:100%;height:100%}
+.media img{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover}
+.card.row>.media{width:64px;flex:none;aspect-ratio:1;border-radius:10px}
+.table .media{width:56px;aspect-ratio:1;border-radius:8px}
 @media(hover:hover){
 @media(prefers-reduced-motion:no-preference){.grid>.card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}}
 }
@@ -239,15 +240,17 @@ const call=(method,path,data)=>api(path,data===undefined?{method}:{method,header
 
 /* ===== App state (boots from /api/bootstrap, a Postgres snapshot) ===== */
 let db={user:null,categories:[],methods:[],products:[]}; // users come from the session; listings live server-side
-const PIC_BY_CATEGORY={electronics:"📷","home & garden":"🪴","home and garden":"🪴",fashion:"🧣",books:"📚",toys:"🚂"};
-const PIC_DEFAULT="📦";
-const pic=p=>PIC_BY_CATEGORY[String(p?.categoryName??"").toLowerCase()]??PIC_DEFAULT;
-const isHttp=u=>typeof u==="string"&&/^https?:\/\//i.test(u);
-const imgTag=(p,alt="")=>isHttp(p?.imageUrl)?`<img src="${esc(p.imageUrl)}" alt="${esc(alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`: "";
-const thumb=(p,big=false)=>`<div class="pic${big?" big":""}"><span class="pic-fallback" aria-hidden="true">${pic(p)}</span>${imgTag(p,big?p.title:"")}</div>`;
+function media(p, big=false){
+ const title=String(p?.title??"");
+ const initials=title.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"M";
+ let h=0;for(const ch of String(p?.categoryName??""))h=(h*31+ch.charCodeAt(0))%360;
+ const fallback=`<svg viewBox="0 0 400 300" aria-hidden="true" focusable="false"><rect width="400" height="300" fill="hsl(${h} 30% 86%)"/><text x="200" y="150" text-anchor="middle" dominant-baseline="middle" font-family="Fraunces, Georgia, serif" font-size="84" fill="hsl(${h} 28% 32%)">${esc(initials)}</text></svg>`;
+ const img=p?.imageUrl?`<img src="${esc(p.imageUrl)}" alt="${esc(title)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display='none'">`:"";
+ return `<div class="media${big?" big":""}">${fallback}${img}</div>`;
+}
 const full=id=>db.products.find(p=>p.id==id);
 
-class CartItem{constructor(p,q){Object.assign(this,{productId:p.id,sellerId:p.sellerId,titleSnapshot:p.title,unitPriceMinor:p.priceMinor,quantity:q,pic:pic(p)})}lineTotalMinor(){return this.unitPriceMinor*this.quantity}}
+class CartItem{constructor(p,q){Object.assign(this,{productId:p.id,sellerId:p.sellerId,titleSnapshot:p.title,unitPriceMinor:p.priceMinor,quantity:q,imageUrl:p.imageUrl??null})}lineTotalMinor(){return this.unitPriceMinor*this.quantity}}
 class Cart{
  constructor(){this.items=store.get("mkt_cart",[]);this.persist()}
  persist(){store.set("mkt_cart",this.items)}
@@ -303,16 +306,16 @@ V.browse=()=>{const f=catalog,base=db.products;let ps=base.filter(p=>(!f.categor
  <div class="fbtns"><button class="sm" data-act="price">Apply</button>${dirty?`<button class="sm ghost" data-act="clearf">Reset</button>`:""}</div>
  <p class="fhint mute">Tip: press Enter in a field to apply.</p></aside>
  <section><div class="row"><span class="mute">${ps.length} result${ps.length==1?"":"s"}</span><span class="sp"></span><select id="sort" style="width:auto"><option value="new">Newest</option><option value="lo" ${f.sort=="lo"?"selected":""}>Price: low to high</option><option value="hi" ${f.sort=="hi"?"selected":""}>Price: high to low</option></select></div>
- ${ps.length?`<div class="grid" style="margin-top:.8rem">${ps.map(p=>`<div class="card"><a href="#/product/${p.id}">${thumb(p)}</a><div style="margin-top:.5rem"><a href="#/product/${p.id}">${esc(p.title)}</a></div><div class="row"><span class="price">${money(p.priceMinor)}</span><span class="sp"></span><button class="sm" data-act="add" data-id="${p.id}">Add</button></div><div class="mute">Sold by ${esc(p.sellerName??full(p.sellerId)?.sellerName??"Seller")}</div></div>`).join("")}</div>`:`<div class="card empty"><h2>Nothing matches just yet</h2><p class="mute">Widen the price range, clear the search, or try another category.</p><button class="sm ghost" data-act="clearf">Clear all filters</button></div>`}</section></div>`};
+ ${ps.length?`<div class="grid" style="margin-top:.8rem">${ps.map(p=>`<div class="card"><a href="#/product/${p.id}">${media(p)}</a><div style="margin-top:.5rem"><a href="#/product/${p.id}">${esc(p.title)}</a></div><div class="row"><span class="price">${money(p.priceMinor)}</span><span class="sp"></span><button class="sm" data-act="add" data-id="${p.id}">Add</button></div><div class="mute">Sold by ${esc(p.sellerName??full(p.sellerId)?.sellerName??"Seller")}</div></div>`).join("")}</div>`:`<div class="card empty"><h2>Nothing matches just yet</h2><p class="mute">Widen the price range, clear the search, or try another category.</p><button class="sm ghost" data-act="clearf">Clear all filters</button></div>`}</section></div>`};
 V.product=async([id])=>{const d=await api("/products/"+encodeURIComponent(id));const p=d.product;if(!p)return"<p>Product not found.</p>";
  const rv=d.reviews??[],rate=d.sellerRating?`${stars(d.sellerRating.avg)} ${d.sellerRating.avg.toFixed(1)} (${d.sellerRating.n})`:"No reviews yet";
- return `<p class="mute"><a href="#/">Browse</a> › ${esc(p.categoryName)}</p><div class="two" style="grid-template-columns:1fr 1fr">${thumb(p,true)}<div>
+ return `<p class="mute"><a href="#/">Browse</a> › ${esc(p.categoryName)}</p><div class="two" style="grid-template-columns:1fr 1fr">${media(p,true)}<div>
  <h1>${esc(p.title)}</h1><div class="price" style="font-size:1.4rem">${money(p.priceMinor)}</div><p class="mute">Sold by ${esc(p.sellerName)} · ${rate}</p><p>${p.qty?`In stock: ${p.qty}`:'<span class="chip bad">Sold out</span>'}</p>
  <p>${db.methods.map(m=>`<span class="chip">${esc(m.name)}</span>`).join(" ")}</p><label>Quantity</label><input id="qty" type="number" min="1" max="${p.qty}" value="1" style="width:90px">
  <div class="row" style="margin-top:.8rem"><button data-act="add" data-id="${p.id}" data-qty ${p.qty?"":"disabled"}>Add to cart</button><button class="ghost" data-act="buy" data-id="${p.id}" ${p.qty?"":"disabled"}>Buy now</button></div>
  <h3 style="margin-top:1.2rem">Description</h3><p>${esc(p.description)}</p><h3>Seller reviews</h3>${rv.map(r=>`<p><span style="color:#f5b301">${stars(r.rating)}</span> ${esc(r.comment||"")}${r.buyerName?` <span class="mute">— ${esc(r.buyerName)}</span>`:""}</p>`).join("")||'<p class="mute">No reviews yet.</p>'}</div></div>`};
 V.cart=()=>{const g=cart.groupBySeller();if(!cart.items.length)return'<div class="card"><h1>Your cart is empty</h1><a href="#/">Find something to buy</a></div>';
- return `<h1>Shopping cart (${cart.count()} items)</h1><div class="two"><div>${Object.entries(g).map(([s,its])=>`<div class="group">Seller: ${esc(full(s)?.sellerName??"Seller")}</div>${its.map(i=>`<div class="card row" style="margin-bottom:.4rem"><span style="font-size:2rem">${i.pic}</span><span class="sp"><a href="#/product/${i.productId}">${esc(i.titleSnapshot)}</a><br><span class="mute">${money(i.unitPriceMinor)} each</span></span><input type="number" min="1" style="width:70px" value="${i.quantity}" data-act="qty" data-id="${i.productId}"><span class="price">${money(i.lineTotalMinor())}</span><button class="sm ghost" data-act="rm" data-id="${i.productId}" aria-label="Remove">✕</button></div>`).join("")}`).join("")}</div>
+ return `<h1>Shopping cart (${cart.count()} items)</h1><div class="two"><div>${Object.entries(g).map(([s,its])=>`<div class="group">Seller: ${esc(full(s)?.sellerName??"Seller")}</div>${its.map(i=>`<div class="card row" style="margin-bottom:.4rem">${media({title:i.titleSnapshot,imageUrl:i.imageUrl})}<span class="sp"><a href="#/product/${i.productId}">${esc(i.titleSnapshot)}</a><br><span class="mute">${money(i.unitPriceMinor)} each</span></span><input type="number" min="1" style="width:70px" value="${i.quantity}" data-act="qty" data-id="${i.productId}"><span class="price">${money(i.lineTotalMinor())}</span><button class="sm ghost" data-act="rm" data-id="${i.productId}" aria-label="Remove">✕</button></div>`).join("")}`).join("")}</div>
  <div class="card"><h2>Order summary</h2><div class="row"><span>Subtotal</span><span class="sp"></span><span>${money(cart.subtotalMinor())}</span></div><p class="mute">Items ship separately per seller. The final total is confirmed by the server.</p><a class="btn" style="display:block;text-align:center" href="#/checkout">Checkout</a></div></div>`};
 V.checkout=()=>{if(!cart.items.length)return'<p>Your cart is empty.</p>';const a=checkout.address,g=cart.groupBySeller();
  return `<h1>Checkout</h1><form data-form="checkout" class="two"><div class="card"><h2>Delivery address</h2><div class="two" style="grid-template-columns:1fr 1fr"><div><label>Full name</label><input name="name" required value="${esc(a.name||auth.user.name)}"></div><div><label>Phone</label><input name="phone" required value="${esc(a.phone)}"></div></div>
@@ -346,7 +349,7 @@ V.seller=async()=>{const u=auth.user;if(!u)return "<p>Sign in first.</p>";
  <h2>Incoming orders</h2><div class="card" style="overflow-x:auto;margin-bottom:1rem"><table><tr><th>Seller order</th><th>Buyer</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr>
  ${sos.map(s=>`<tr><td>#${s.id}</td><td>${esc(s.buyerName)}${s.delivery?.street?`<br><span class="mute">${esc(s.delivery.street)}, ${esc(s.delivery.city)}</span>`:""}</td><td>${s.items.map(i=>`${i.qty}× ${esc(i.title)}`).join(", ")}</td><td>${money(s.totalMinor)}</td><td><span class="chip ${s.fulfillment=="cancelled"?"bad":""}">${LABEL[s.fulfillment]??s.fulfillment}</span></td><td>${btnFor(s)}</td></tr>`).join("")||'<tr><td colspan="6" class="mute">No orders yet.</td></tr>'}</table></div>
  <div class="row"><h2 class="sp">My listings</h2></div><div class="card" style="overflow-x:auto"><table><tr><th></th><th>Title</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>
- ${mine.map(p=>`<tr><td style="font-size:1.6rem">${pic(p)}</td><td>${esc(p.title)}</td><td>${money(p.priceMinor)}</td><td>${p.qty}</td><td><span class="chip ${p.status=="active"?"ok":""}">${esc(p.status)}</span></td><td><a href="#/seller/edit/${p.id}">Edit</a></td></tr>`).join("")||'<tr><td colspan="6" class="mute">No listings yet — create your first one.</td></tr>'}</table></div>`};
+ ${mine.map(p=>`<tr><td>${media(p)}</td><td>${esc(p.title)}</td><td>${money(p.priceMinor)}</td><td>${p.qty}</td><td><span class="chip ${p.status=="active"?"ok":""}">${esc(p.status)}</span></td><td><a href="#/seller/edit/${p.id}">Edit</a></td></tr>`).join("")||'<tr><td colspan="6" class="mute">No listings yet — create your first one.</td></tr>'}</table></div>`};
 V.edit=async([id])=>{const isNew=id=="new";
  let p={title:"",categoryId:db.categories[0]?.id??1,priceMinor:2000,qty:1,description:"",status:"active",imageUrl:""};
  if(!isNew){const l=(await api("/seller/listings")).listings.find(x=>String(x.id)===String(id));
