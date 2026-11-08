@@ -9,25 +9,26 @@
 <link href="/admin/static/css/admin.css" rel="stylesheet">
 </head>
 <body>
+<%- include('icons') %>
 <% const nav = [
-  { key: 'dashboard', label: 'Dashboard',        href: '/admin',          icon: 'gauge',     ready: true  },
-  { key: 'users',     label: 'Users',            href: '/admin/users',    icon: 'users',          ready: true  },
-  { key: 'sellers',   label: 'Seller approvals', href: '/admin/users?approval=pending', icon: 'user-check', ready: true  },
-  { key: 'products',  label: 'Products',         href: '/admin/products', icon: 'package',            ready: true  },
-  { key: 'orders',    label: 'Orders',           href: '/admin/orders',   icon: 'receipt',        ready: true  },
-  { key: 'exchange',  label: 'Exchange methods', href: '/admin/exchange', icon: 'truck',          ready: true,  superOnly: true },
-  { key: 'reports',   label: 'Reports',          href: '/admin/reports',  icon: 'chart-line',     ready: false },
-  { key: 'audit',     label: 'Audit logs',       href: '/admin/audit',    icon: 'clipboard', ready: true,  superOnly: true },
-  { key: 'settings',  label: 'Settings',         href: '/admin/settings', icon: 'gear',           ready: false, superOnly: true }
+  { key: 'dashboard', label: 'Dashboard',        href: '/admin',          icon: 'icon-dashboard', ready: true  },
+  { key: 'users',     label: 'Users',            href: '/admin/users',    icon: 'icon-users', ready: true  },
+  { key: 'sellers',   label: 'Seller approvals', href: '/admin/users?approval=pending', icon: 'icon-user-check', ready: true  },
+  { key: 'products',  label: 'Products',         href: '/admin/products', icon: 'icon-package', ready: true  },
+  { key: 'orders',    label: 'Orders',           href: '/admin/orders',   icon: 'icon-receipt', ready: true  },
+  { key: 'exchange',  label: 'Exchange methods', href: '/admin/exchange', icon: 'icon-truck', ready: true,  superOnly: true },
+  { key: 'reports',   label: 'Reports',          href: '/admin/reports',  icon: 'icon-chart', ready: false },
+  { key: 'audit',     label: 'Audit logs',       href: '/admin/audit',    icon: 'icon-clipboard', ready: true,  superOnly: true },
+  { key: 'settings',  label: 'Settings',         href: '/admin/settings', icon: 'icon-gear', ready: false, superOnly: true }
 ]; %>
 <div class="admin-shell d-flex">
   <nav class="admin-sidebar">
     <div class="brand">M-DUKA<span class="brand-dot">.</span><small>Admin panel</small></div>
     <% nav.forEach(n => { if (n.superOnly && !isSuper) return; %>
       <% if (n.ready) { %>
-        <a class="nav-item-link <%= active === n.key ? 'active' : '' %>" href="<%= n.href %>"><i class="ph ph-<%= n.icon %>"></i> <%= n.label %></a>
+        <a class="nav-item-link <%= active === n.key ? 'active' : '' %>" href="<%= n.href %>"><svg class="icon" aria-hidden="true"><use href="#<%= n.icon %>"></use></svg> <%= n.label %></a>
       <% } else { %>
-        <span class="nav-item-link disabled"><i class="ph ph-<%= n.icon %>"></i> <%= n.label %></span>
+        <span class="nav-item-link disabled"><svg class="icon" aria-hidden="true"><use href="#<%= n.icon %>"></use></svg> <%= n.label %> <span class="soon">Soon</span></span>
       <% } %>
     <% }) %>
     <div class="signed-in">Signed in as <%= isSuper ? 'Super admin' : 'Admin' %></div>
@@ -37,7 +38,7 @@
       <h1 class="h3 m-0"><%= title %></h1>
       <form method="post" action="/admin/logout" class="d-flex align-items-center gap-3 m-0">
         <span class="text-muted"><%= user.name %></span>
-        <button class="btn btn-outline-secondary btn-sm">Log out</button>
+        <button class="btn btn-outline-secondary btn-sm"><svg class="icon" aria-hidden="true"><use href="#icon-logout"></use></svg> Log out</button>
       </form>
     </header>
 

@@ -6,7 +6,7 @@
   <form class="row g-2 mb-3" method="post" action="/admin/exchange">
     <div class="col-md-3"><input class="form-control" name="name" maxlength="120" placeholder="Name, e.g. In-person pickup" required aria-label="Name"></div>
     <div class="col-md-6"><input class="form-control" name="description" maxlength="1000" placeholder="Description (optional)" aria-label="Description"></div>
-    <div class="col-md-3"><button class="btn btn-success w-100"><i class="ph ph-plus"></i> Add method</button></div>
+    <div class="col-md-3"><button class="btn btn-success w-100"><svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg> Add method</button></div>
   </form>
   <% if (!methods.length) { %><p class="text-muted mb-0">No exchange methods yet. Sellers cannot complete a sale without one.</p><% } else { %>
   <div class="table-responsive"><table class="table align-middle mb-0">
@@ -43,7 +43,7 @@
   <form class="row g-2 mb-3" method="post" action="/admin/exchange/providers">
     <div class="col-md-3"><input class="form-control" name="provider_code" maxlength="40" placeholder="Code, e.g. mpesa" required aria-label="Provider code"></div>
     <div class="col-md-6"><input class="form-control" name="display_name" maxlength="120" placeholder="Display name, e.g. M-Pesa" required aria-label="Display name"></div>
-    <div class="col-md-3"><button class="btn btn-success w-100"><i class="ph ph-plus"></i> Add provider</button></div>
+    <div class="col-md-3"><button class="btn btn-success w-100"><svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg> Add provider</button></div>
   </form>
   <% if (!providers.length) { %><p class="text-muted mb-0">No payment providers yet.</p><% } else { %>
   <div class="table-responsive"><table class="table align-middle mb-0">

@@ -2,7 +2,6 @@
    Same brand family as the storefront (Fraunces + Instrument Sans, terracotta
    accent), but a quieter, higher-contrast back-office treatment. */
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Instrument+Sans:wght@400..700&display=swap");
-@import url("https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.min.css");
 
 :root{
   --paper:#f3efe5; --panel:#fffdf6; --ink:#262a1d; --mute:#6f6653;
@@ -41,6 +40,12 @@ a:hover{color:var(--acc-deep)}
 .nav-item-link:hover{background:rgba(255,255,255,.07);color:#fff;text-decoration:none}
 .nav-item-link.active{background:var(--acc);color:var(--acc-ink)}
 .nav-item-link.disabled{opacity:.4;cursor:not-allowed}
+.icon{width:20px;height:20px;flex:none;display:inline-block;vertical-align:-.2em}
+.btn .icon{width:16px;height:16px}
+.nav-item-link .icon{width:20px;height:20px}
+.soon{margin-left:auto;font-size:.65rem;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--side-mute);border:1px solid currentColor;
+  border-radius:999px;padding:.05rem .4rem}
 .signed-in{margin-top:auto;padding:14px;font-size:.8rem;color:var(--side-mute)}
 
 /* ---- main content ---- */

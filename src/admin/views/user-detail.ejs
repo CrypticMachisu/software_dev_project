@@ -3,7 +3,7 @@
    const roleBadge = (r) => r.status === 'approved' ? 'text-bg-success' : r.status === 'pending' ? 'text-bg-warning' : 'text-bg-danger';
    const held = target.roles.map(r => r.role);
    const priv = (r) => r === 'admin' || r === 'super_admin'; %>
-<p><a href="/admin/users" class="text-decoration-none"><i class="ph ph-arrow-left"></i> All users</a></p>
+<p><a href="/admin/users" class="text-decoration-none"><svg class="icon" aria-hidden="true"><use href="#icon-arrow-left"></use></svg> All users</a></p>
 <% if (ok) { %><div class="alert alert-success py-2"><%= ok %></div><% } %>
 <% if (error) { %><div class="alert alert-danger py-2"><%= error %></div><% } %>
 

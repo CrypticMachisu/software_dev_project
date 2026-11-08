@@ -325,6 +325,7 @@ async function main() {
     ok("Super admin login redirects into panel", login.res.status === 302, `status ${login.res.status}`);
     const dash = await admin.text("/admin");
     ok("Dashboard renders", dash.status === 200 && dash.body.includes("Dashboard"));
+    ok("Admin uses inline SVG icons", dash.body.includes('<symbol id="icon-dashboard"') && !dash.body.includes("ph ph-"));
     for (const p of ["/admin/products", "/admin/products/categories", "/admin/orders", "/admin/users", "/admin/exchange", "/admin/audit"]) {
       const r = await admin.text(p);
       ok(`GET ${p} 200`, r.status === 200, `status ${r.status}`);
