@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import { pool } from "../db.js";
+import { env } from "../env.js";
 import "../admin/types.js"; // Express.Request.user augmentation
 
 /**
@@ -20,6 +21,7 @@ api.use(express.json({ limit: "100kb" }));
 // ---------- helpers ----------
 
 const IDLE_MINUTES = 30;
+const CURRENCY = env.currency;
 const hashToken = (token: string): Buffer =>
   crypto.createHash("sha256").update(token).digest();
 
@@ -87,6 +89,7 @@ function rowToProduct(row: Record<string, unknown>): Record<string, unknown> {
     categoryName: row.category_name,
     title: row.title,
     description: row.description,
+    imageUrl: row.image_url ?? null,
     priceMinor: Math.round(Number(row.asking_price) * 100),
     qty: Number(row.quantity_available),
     status: row.listing_status,
@@ -140,7 +143,7 @@ async function loadCatalogue(version: number): Promise<CatalogueSnapshot> {
   const [products, categories, methods] = await Promise.all([
     q<Record<string, unknown>>(
       `SELECT p.product_id, p.seller_id, u.name AS seller_name, p.category_id, c.name AS category_name,
-              p.title, p.description, p.asking_price, p.quantity_available, p.listing_status
+              p.title, p.description, p.image_url, p.asking_price, p.quantity_available, p.listing_status
        FROM product p
        JOIN app_user u ON u.user_id = p.seller_id
        JOIN category c ON c.category_id = p.category_id
@@ -324,6 +327,7 @@ api.get("/bootstrap", asyncWrap(async (req, res) => {
   ]);
   res.json({
     user,
+    currency: CURRENCY,
     categories: data.categories,
     methods: data.methods,
     products: data.products.map(rowToProduct),
@@ -360,7 +364,7 @@ api.get("/products", asyncWrap(async (req, res) => {
     ? { rows: await activeProducts() }
     : await q<Record<string, unknown>>(
       `SELECT p.product_id, p.seller_id, u.name AS seller_name, p.category_id, c.name AS category_name,
-              p.title, p.description, p.asking_price, p.quantity_available, p.listing_status
+              p.title, p.description, p.image_url, p.asking_price, p.quantity_available, p.listing_status
        FROM product p
        JOIN app_user u ON u.user_id = p.seller_id
        JOIN category c ON c.category_id = p.category_id
@@ -380,7 +384,7 @@ api.get("/products/:id", asyncWrap(async (req, res) => {
   if (!Number.isInteger(id)) return void fail(res, 400, "Invalid product id.");
   const { rows } = await q<Record<string, unknown>>(
     `SELECT p.product_id, p.seller_id, u.name AS seller_name, p.category_id, c.name AS category_name,
-            p.title, p.description, p.asking_price, p.quantity_available, p.listing_status
+            p.title, p.description, p.image_url, p.asking_price, p.quantity_available, p.listing_status
      FROM product p
      JOIN app_user u  ON u.user_id = p.seller_id
      JOIN category c  ON c.category_id = p.category_id
@@ -481,8 +485,8 @@ api.post("/checkout", asyncWrap(async (req, res, next) => {
     const orderRes = await client.query<{ order_id: string; ordered_at: Date }>(
       `INSERT INTO market_order (buyer_id, currency, total_amount_minor,
                                  delivery_name, delivery_phone, delivery_street, delivery_city, delivery_zip)
-       VALUES ($1, 'USD', $2, $3, $4, $5, $6, $7) RETURNING order_id, ordered_at`,
-      [user.user_id, totalMinor, delivery.name, delivery.phone || null, delivery.street,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING order_id, ordered_at`,
+      [user.user_id, CURRENCY, totalMinor, delivery.name, delivery.phone || null, delivery.street,
         delivery.city || null, delivery.zip || null],
     );
     const orderId = orderRes.rows[0].order_id;
@@ -706,7 +710,7 @@ api.get("/seller/listings", asyncWrap(async (req, res) => {
   const user = await requireUser(req, res);
   if (!user) return;
   const { rows } = await q<Record<string, unknown>>(
-    `SELECT p.product_id, p.seller_id, p.category_id, c.name AS category_name, p.title, p.description,
+    `SELECT p.product_id, p.seller_id, p.category_id, c.name AS category_name, p.title, p.description, p.image_url,
             p.asking_price, p.quantity_available, p.listing_status
      FROM product p JOIN category c USING(category_id)
      WHERE p.seller_id = $1 ORDER BY p.product_id DESC`, [user.user_id]);
@@ -827,8 +831,11 @@ function readListing(body: Record<string, unknown>): { error?: string; value?: R
   const priceRaw = Number(body.priceMinor) / 100; // client sends dollars in priceMinor? (kept name from mock)
   const price = Number.isFinite(priceRaw) && priceRaw > 0 ? Math.round(priceRaw * 100) / 100 : NaN;
   const qty = Number(body.qty);
+  const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
   const status = ["draft", "active", "paused", "removed"].includes(String(body.status)) ? String(body.status) : "draft";
   if (!title || title.length > 200) return { error: "Title is required (max 200 characters)." };
+  if (imageUrl.length > 500) return { error: "Image URL must be 500 characters or fewer." };
+  if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return { error: "Image URL must start with http:// or https://." };
   if (!Number.isInteger(categoryId)) return { error: "Pick a category." };
   if (!Number.isFinite(price) || price <= 0) return { error: "Price must be a positive number." };
   if (!Number.isInteger(qty) || qty < 0) return { error: "Quantity must be zero or more." };
@@ -836,6 +843,7 @@ function readListing(body: Record<string, unknown>): { error?: string; value?: R
     title, categoryId, asking_price: price, quantity_available: qty,
     description: String(body.description ?? "").slice(0, 2000) || null,
     listing_status: status,
+    image_url: imageUrl || null,
   } };
 }
 
@@ -846,12 +854,12 @@ api.post("/seller/listings", asyncWrap(async (req, res) => {
   const parsed = readListing(req.body as Record<string, unknown>);
   if (parsed.error) return void fail(res, 400, parsed.error);
   const v = parsed.value as { title: string; categoryId: number; asking_price: number;
-    quantity_available: number; description: string | null; listing_status: string };
+    quantity_available: number; description: string | null; listing_status: string; image_url: string | null };
   try {
     const { rows } = await q<{ product_id: string }>(
-      `INSERT INTO product (seller_id, category_id, title, description, asking_price, quantity_available, listing_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING product_id`,
-      [user.user_id, v.categoryId, v.title, v.description, v.asking_price, v.quantity_available, v.listing_status]);
+      `INSERT INTO product (seller_id, category_id, title, description, asking_price, quantity_available, listing_status, image_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING product_id`,
+      [user.user_id, v.categoryId, v.title, v.description, v.asking_price, v.quantity_available, v.listing_status, v.image_url]);
     res.status(201).json({ id: rows[0].product_id });
     invalidateCatalogue();
   } catch {
@@ -869,12 +877,12 @@ api.put("/seller/listings/:id", asyncWrap(async (req, res) => {
   const parsed = readListing(req.body as Record<string, unknown>);
   if (parsed.error) return void fail(res, 400, parsed.error);
   const v = parsed.value as { title: string; categoryId: number; asking_price: number;
-    quantity_available: number; description: string | null; listing_status: string };
+    quantity_available: number; description: string | null; listing_status: string; image_url: string | null };
   await q(
     `UPDATE product SET category_id=$2, title=$3, description=$4, asking_price=$5,
-            quantity_available=$6, listing_status=$7, updated_at=now()
+            quantity_available=$6, listing_status=$7, image_url=$8, updated_at=now()
      WHERE product_id = $1`,
-    [id, v.categoryId, v.title, v.description, v.asking_price, v.quantity_available, v.listing_status]);
+    [id, v.categoryId, v.title, v.description, v.asking_price, v.quantity_available, v.listing_status, v.image_url]);
   invalidateCatalogue();
   res.json({ ok: true });
 }));

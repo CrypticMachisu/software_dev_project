@@ -68,10 +68,10 @@ async function makeSeller(jar) {
   await jar.json("/api/roles/seller", { method: "POST" });
 }
 
-async function createListing(jar, { title, priceMinor, qty, categoryId }) {
+async function createListing(jar, { title, priceMinor, qty, categoryId, imageUrl }) {
   return jar.json("/api/seller/listings", {
     method: "POST",
-    json: { title, categoryId, priceMinor, qty, status: "active", description: "stress test item" },
+    json: { title, categoryId, priceMinor, qty, status: "active", description: "stress test item", imageUrl },
   });
 }
 
@@ -129,6 +129,7 @@ async function main() {
     const one = products[0];
     const d = await anon.json("/api/products/" + one.id);
     ok("Product detail 200 with seller rating shape", d.status === 200 && d.data.product?.id === one.id);
+    ok("Product carries an imageUrl field (nullable)", "imageUrl" in (d.data.product ?? {}), JSON.stringify(d.data.product?.imageUrl));
     const missing = await anon.json("/api/products/999999999");
     ok("Missing product 404", missing.status === 404);
     const bad = await anon.json("/api/products/not-a-number");
@@ -183,6 +184,12 @@ async function main() {
     ok("Orders require login (401)", anonOrders.status === 401);
     const anonCheckout = await anon.json("/api/checkout", { method: "POST", json: { items: [{ productId: listingId, quantity: 1 }], address: { name: "A", street: "B" } } });
     ok("Checkout requires login (401)", anonCheckout.status === 401);
+    const img = await createListing(seller, { title: "Stress image " + Date.now(), priceMinor: 1200, qty: 1, categoryId, imageUrl: "https://images.example.com/widget.jpg" });
+    ok("Listing accepts an http(s) image URL", img.status === 201, `status ${img.status}`);
+    const all = await anon.json("/api/products");
+    ok("Image URL appears in the public catalogue", all.data.products.some((p) => p.imageUrl === "https://images.example.com/widget.jpg"));
+    const badImg = await createListing(seller, { title: "Bad image " + Date.now(), priceMinor: 1200, qty: 1, categoryId, imageUrl: "javascript:alert(1)" });
+    ok("Non-http image URL rejected 400", badImg.status === 400, `status ${badImg.status}`);
     const update = await seller.json("/api/seller/listings/" + listingId, { method: "PUT", json: { title: "Stress widget updated", categoryId, priceMinor: 2500, qty: 5, status: "active", description: "x" } });
     ok("Seller can update own listing", update.status === 200);
     const other = await buyer.json("/api/seller/listings/" + listingId, { method: "PUT", json: { title: "Hijack", categoryId, priceMinor: 1, qty: 1, status: "active" } });
@@ -200,6 +207,7 @@ async function main() {
     ok("Checkout with duplicate lines 201 (lines merged)", co.status === 201 && !!orderId, `status ${co.status}`);
     const det = await buyer.json("/api/order/" + orderId);
     ok("Order visible to buyer with one merged line qty 3", det.status === 200 && det.data.order.sellerOrders[0]?.items.length === 1 && det.data.order.sellerOrders[0].items[0].qty === 3, JSON.stringify(det.data?.order?.sellerOrders?.[0]?.items));
+    ok("Checkout stores APP_CURRENCY on the order", det.data.order.currency === appCurrency, `${det.data?.order?.currency} vs ${appCurrency}`);
     ok("Checkout persists the delivery address", det.data.order.delivery?.street === addr.street && det.data.order.delivery?.city === addr.city, JSON.stringify(det.data?.order?.delivery));
     sellerOrderId = det.data?.order?.sellerOrders?.[0]?.id;
     const other = await seller.json("/api/order/" + orderId);

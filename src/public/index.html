@@ -223,7 +223,8 @@ td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);ve
 /* ===== Utilities ===== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const money=(m,c="USD")=>new Intl.NumberFormat("en",{style:"currency",currency:c}).format(m/100);
+let CURRENCY="USD";
+const money=(m,c=CURRENCY)=>new Intl.NumberFormat("en",{style:"currency",currency:c}).format(m/100);
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 function toast(t){const e=document.createElement("div");e.className="toast";e.setAttribute("role","status");e.setAttribute("aria-live","polite");e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),3500)}
 
@@ -291,7 +292,7 @@ V.browse=()=>{const f=catalog,base=db.products;let ps=base.filter(p=>(!f.categor
  return `<h1>Browse the market</h1><div class="layout"><aside aria-label="Filters"><h3>Categories</h3><div class="fcats">
  <a class="fcat ${f.categoryId?"":"on"}" href="#" data-act="cat" data-id="0"><span>All</span><span class="cnt">${cnt(0)}</span></a>
  ${db.categories.map(c=>`<a class="fcat ${f.categoryId==c.id?"on":""}" href="#" data-act="cat" data-id="${c.id}"><span>${esc(c.name)}</span><span class="cnt">${cnt(c.id)}</span></a>`).join("")}</div>
- <h3>Price (USD)</h3><div class="prange"><input id="min" inputmode="numeric" placeholder="Min" maxlength="7" value="${esc(f.min)}" aria-label="Minimum price"><span class="dash">–</span><input id="max" inputmode="numeric" placeholder="Max" maxlength="7" value="${esc(f.max)}" aria-label="Maximum price"></div>
+ <h3>Price (${CURRENCY})</h3><div class="prange"><input id="min" inputmode="numeric" placeholder="Min" maxlength="7" value="${esc(f.min)}" aria-label="Minimum price"><span class="dash">–</span><input id="max" inputmode="numeric" placeholder="Max" maxlength="7" value="${esc(f.max)}" aria-label="Maximum price"></div>
  <div class="fbtns"><button class="sm" data-act="price">Apply</button>${dirty?`<button class="sm ghost" data-act="clearf">Reset</button>`:""}</div>
  <p class="fhint mute">Tip: press Enter in a field to apply.</p></aside>
  <section><div class="row"><span class="mute">${ps.length} result${ps.length==1?"":"s"}</span><span class="sp"></span><select id="sort" style="width:auto"><option value="new">Newest</option><option value="lo" ${f.sort=="lo"?"selected":""}>Price: low to high</option><option value="hi" ${f.sort=="hi"?"selected":""}>Price: high to low</option></select></div>
@@ -344,7 +345,7 @@ V.edit=async([id])=>{const isNew=id=="new";
  if(!isNew){const l=(await api("/seller/listings")).listings.find(x=>String(x.id)===String(id));
   if(!l)return `<div class="card"><h1>Listing not found</h1><a href="#/seller">Back to my listings</a></div>`;p=l}
  return `<h1>${isNew?"Create listing":"Edit listing"}</h1><form data-form="listing" data-id="${id}" class="card" style="max-width:640px"><label>Title</label><input name="title" required maxlength="200" value="${esc(p.title)}">
- <div class="two" style="grid-template-columns:1fr 1fr"><div><label>Category</label><select name="categoryId">${db.categories.map(c=>`<option value="${c.id}" ${c.id==p.categoryId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Price (USD)</label><input name="price" type="number" step="0.01" min="0.01" required value="${(p.priceMinor/100).toFixed(2)}"></div></div>
+ <div class="two" style="grid-template-columns:1fr 1fr"><div><label>Category</label><select name="categoryId">${db.categories.map(c=>`<option value="${c.id}" ${c.id==p.categoryId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Price (${CURRENCY})</label><input name="price" type="number" step="0.01" min="0.01" required value="${(p.priceMinor/100).toFixed(2)}"></div></div>
  <div class="two" style="grid-template-columns:1fr 1fr"><div><label>Quantity</label><input name="qty" type="number" min="0" required value="${p.qty}"></div><div><label>Status</label><select name="status"><option value="draft" ${p.status=="draft"?"selected":""}>Draft</option><option value="active" ${p.status=="active"?"selected":""}>Active</option><option value="paused" ${p.status=="paused"?"selected":""}>Paused</option></select></div></div>
  <label>Description</label><textarea name="description" rows="4">${esc(p.description)}</textarea><div class="row" style="margin-top:1rem"><button>${isNew?"Publish":"Save changes"}</button><a href="#/seller">Cancel</a></div></form>`};
 
@@ -438,7 +439,7 @@ async function route(){const [path,qs]=(location.hash.slice(1)||"/").split("?"),
 
 /* ===== Boot: pull a fresh snapshot from the Postgres-backed API ===== */
 (async function boot(){
- try{const d=await api("/bootstrap");db.user=d.user;db.categories=d.categories;db.methods=d.methods;db.products=d.products;
+ try{const d=await api("/bootstrap");db.user=d.user;CURRENCY=d.currency??"USD";db.categories=d.categories;db.methods=d.methods;db.products=d.products;
   localStorage.removeItem("mkt_db");localStorage.removeItem("mkt_uid")} // legacy demo stores are gone for good
  catch(x){toast("The market is offline — "+x.message)}
  route()})();
