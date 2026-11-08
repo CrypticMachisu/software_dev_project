@@ -93,6 +93,7 @@ async function main() {
     ok("Storefront boots from the API, not a localStorage seed", root.body.includes('api("/bootstrap")') && !root.body.includes("mkt_db:{"));
     ok("Storefront has a skip link to #app", root.body.includes('class="skip"') && root.body.includes('href="#app"'));
     ok("Storefront has a visible browse heading", root.body.includes("Browse the market"));
+    ok("Storefront product imagery falls back and lazy-loads", root.body.includes("const thumb=") && root.body.includes('loading="lazy"') && root.body.includes(".pic img{"));
     ok("Review dialog is announced", root.body.includes('setAttribute("role","dialog")') && root.body.includes('setAttribute("aria-modal","true")'));
     ok("Toasts are live regions", root.body.includes('setAttribute("role","status")') && root.body.includes('setAttribute("aria-live","polite")'));
   }

@@ -126,12 +126,16 @@ aside .fhint{margin-top:.55rem;font-size:.76rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:1.05rem}
 .grid>.card{padding:.55rem .55rem 1rem;border-radius:var(--r-lg);
   transition:transform .35s cubic-bezier(.32,.72,0,1),box-shadow .3s .03s cubic-bezier(.32,.72,0,1)}
-.grid>.card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
 .grid>.card a:hover{text-decoration:none}
-.grid>.card:hover a{text-decoration:underline}
-.pic{display:grid;place-items:center;height:150px;font-size:3.4rem;border-radius:calc(var(--r-lg) - 6px);
-  background:linear-gradient(150deg,var(--acc-soft),var(--chip))}
+@media(hover:hover){.grid>.card:hover a{text-decoration:underline}}
+.pic{position:relative;display:grid;place-items:center;height:150px;font-size:3.4rem;
+  border-radius:calc(var(--r-lg) - 6px);overflow:hidden;background:linear-gradient(150deg,var(--acc-soft),var(--chip))}
+.pic-fallback{position:relative;z-index:0}
+.pic img{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover;background:var(--chip)}
 .pic.big{height:320px;font-size:6.8rem;border-radius:var(--r-lg)}
+@media(hover:hover){
+@media(prefers-reduced-motion:no-preference){.grid>.card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}}
+}
 .price{font-family:Fraunces,Georgia,serif;font-weight:620;font-size:1.08rem;font-variant-numeric:tabular-nums}
 
 /* ---- seller analytics ---- */
@@ -238,6 +242,9 @@ let db={user:null,categories:[],methods:[],products:[]}; // users come from the 
 const PIC_BY_CATEGORY={electronics:"📷","home & garden":"🪴","home and garden":"🪴",fashion:"🧣",books:"📚",toys:"🚂"};
 const PIC_DEFAULT="📦";
 const pic=p=>PIC_BY_CATEGORY[String(p?.categoryName??"").toLowerCase()]??PIC_DEFAULT;
+const isHttp=u=>typeof u==="string"&&/^https?:\/\//i.test(u);
+const imgTag=(p,alt="")=>isHttp(p?.imageUrl)?`<img src="${esc(p.imageUrl)}" alt="${esc(alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`: "";
+const thumb=(p,big=false)=>`<div class="pic${big?" big":""}"><span class="pic-fallback" aria-hidden="true">${pic(p)}</span>${imgTag(p,big?p.title:"")}</div>`;
 const full=id=>db.products.find(p=>p.id==id);
 
 class CartItem{constructor(p,q){Object.assign(this,{productId:p.id,sellerId:p.sellerId,titleSnapshot:p.title,unitPriceMinor:p.priceMinor,quantity:q,pic:pic(p)})}lineTotalMinor(){return this.unitPriceMinor*this.quantity}}
@@ -296,10 +303,10 @@ V.browse=()=>{const f=catalog,base=db.products;let ps=base.filter(p=>(!f.categor
  <div class="fbtns"><button class="sm" data-act="price">Apply</button>${dirty?`<button class="sm ghost" data-act="clearf">Reset</button>`:""}</div>
  <p class="fhint mute">Tip: press Enter in a field to apply.</p></aside>
  <section><div class="row"><span class="mute">${ps.length} result${ps.length==1?"":"s"}</span><span class="sp"></span><select id="sort" style="width:auto"><option value="new">Newest</option><option value="lo" ${f.sort=="lo"?"selected":""}>Price: low to high</option><option value="hi" ${f.sort=="hi"?"selected":""}>Price: high to low</option></select></div>
- ${ps.length?`<div class="grid" style="margin-top:.8rem">${ps.map(p=>`<div class="card"><a href="#/product/${p.id}"><div class="pic">${pic(p)}</div></a><div style="margin-top:.5rem"><a href="#/product/${p.id}">${esc(p.title)}</a></div><div class="row"><span class="price">${money(p.priceMinor)}</span><span class="sp"></span><button class="sm" data-act="add" data-id="${p.id}">Add</button></div><div class="mute">Sold by ${esc(p.sellerName??full(p.sellerId)?.sellerName??"Seller")}</div></div>`).join("")}</div>`:`<div class="card empty"><h2>Nothing matches just yet</h2><p class="mute">Widen the price range, clear the search, or try another category.</p><button class="sm ghost" data-act="clearf">Clear all filters</button></div>`}</section></div>`};
+ ${ps.length?`<div class="grid" style="margin-top:.8rem">${ps.map(p=>`<div class="card"><a href="#/product/${p.id}">${thumb(p)}</a><div style="margin-top:.5rem"><a href="#/product/${p.id}">${esc(p.title)}</a></div><div class="row"><span class="price">${money(p.priceMinor)}</span><span class="sp"></span><button class="sm" data-act="add" data-id="${p.id}">Add</button></div><div class="mute">Sold by ${esc(p.sellerName??full(p.sellerId)?.sellerName??"Seller")}</div></div>`).join("")}</div>`:`<div class="card empty"><h2>Nothing matches just yet</h2><p class="mute">Widen the price range, clear the search, or try another category.</p><button class="sm ghost" data-act="clearf">Clear all filters</button></div>`}</section></div>`};
 V.product=async([id])=>{const d=await api("/products/"+encodeURIComponent(id));const p=d.product;if(!p)return"<p>Product not found.</p>";
  const rv=d.reviews??[],rate=d.sellerRating?`${stars(d.sellerRating.avg)} ${d.sellerRating.avg.toFixed(1)} (${d.sellerRating.n})`:"No reviews yet";
- return `<p class="mute"><a href="#/">Browse</a> › ${esc(p.categoryName)}</p><div class="two" style="grid-template-columns:1fr 1fr"><div class="pic big">${pic(p)}</div><div>
+ return `<p class="mute"><a href="#/">Browse</a> › ${esc(p.categoryName)}</p><div class="two" style="grid-template-columns:1fr 1fr">${thumb(p,true)}<div>
  <h1>${esc(p.title)}</h1><div class="price" style="font-size:1.4rem">${money(p.priceMinor)}</div><p class="mute">Sold by ${esc(p.sellerName)} · ${rate}</p><p>${p.qty?`In stock: ${p.qty}`:'<span class="chip bad">Sold out</span>'}</p>
  <p>${db.methods.map(m=>`<span class="chip">${esc(m.name)}</span>`).join(" ")}</p><label>Quantity</label><input id="qty" type="number" min="1" max="${p.qty}" value="1" style="width:90px">
  <div class="row" style="margin-top:.8rem"><button data-act="add" data-id="${p.id}" data-qty ${p.qty?"":"disabled"}>Add to cart</button><button class="ghost" data-act="buy" data-id="${p.id}" ${p.qty?"":"disabled"}>Buy now</button></div>
