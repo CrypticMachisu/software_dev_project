@@ -348,13 +348,15 @@ V.seller=async()=>{const u=auth.user;if(!u)return "<p>Sign in first.</p>";
  <div class="row"><h2 class="sp">My listings</h2></div><div class="card" style="overflow-x:auto"><table><tr><th></th><th>Title</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>
  ${mine.map(p=>`<tr><td style="font-size:1.6rem">${pic(p)}</td><td>${esc(p.title)}</td><td>${money(p.priceMinor)}</td><td>${p.qty}</td><td><span class="chip ${p.status=="active"?"ok":""}">${esc(p.status)}</span></td><td><a href="#/seller/edit/${p.id}">Edit</a></td></tr>`).join("")||'<tr><td colspan="6" class="mute">No listings yet — create your first one.</td></tr>'}</table></div>`};
 V.edit=async([id])=>{const isNew=id=="new";
- let p={title:"",categoryId:db.categories[0]?.id??1,priceMinor:2000,qty:1,description:"",status:"active"};
+ let p={title:"",categoryId:db.categories[0]?.id??1,priceMinor:2000,qty:1,description:"",status:"active",imageUrl:""};
  if(!isNew){const l=(await api("/seller/listings")).listings.find(x=>String(x.id)===String(id));
   if(!l)return `<div class="card"><h1>Listing not found</h1><a href="#/seller">Back to my listings</a></div>`;p=l}
  return `<h1>${isNew?"Create listing":"Edit listing"}</h1><form data-form="listing" data-id="${id}" class="card" style="max-width:640px"><label>Title</label><input name="title" required maxlength="200" value="${esc(p.title)}">
  <div class="two" style="grid-template-columns:1fr 1fr"><div><label>Category</label><select name="categoryId">${db.categories.map(c=>`<option value="${c.id}" ${c.id==p.categoryId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Price (${CURRENCY})</label><input name="price" type="number" step="0.01" min="0.01" required value="${(p.priceMinor/100).toFixed(2)}"></div></div>
  <div class="two" style="grid-template-columns:1fr 1fr"><div><label>Quantity</label><input name="qty" type="number" min="0" required value="${p.qty}"></div><div><label>Status</label><select name="status"><option value="draft" ${p.status=="draft"?"selected":""}>Draft</option><option value="active" ${p.status=="active"?"selected":""}>Active</option><option value="paused" ${p.status=="paused"?"selected":""}>Paused</option></select></div></div>
- <label>Description</label><textarea name="description" rows="4">${esc(p.description)}</textarea><div class="row" style="margin-top:1rem"><button>${isNew?"Publish":"Save changes"}</button><a href="#/seller">Cancel</a></div></form>`};
+ <label>Description</label><textarea name="description" rows="4">${esc(p.description)}</textarea>
+ <label>Image URL (optional)</label><input name="imageUrl" type="url" maxlength="500" value="${esc(p.imageUrl??"")}" placeholder="https://…"><div class="fhint mute">Use a public http(s) image. Leave blank for a designed fallback.</div>
+ <div class="row" style="margin-top:1rem"><button>${isNew?"Publish":"Save changes"}</button><a href="#/seller">Cancel</a></div></form>`};
 
 /* ===== Click Actions and Event Listeners ===== */
 const A={
@@ -428,7 +430,7 @@ document.addEventListener("submit",ev=>{const f=ev.target,k=f.dataset.form;if(!k
    const m={};Object.keys(cart.groupBySeller()).forEach(s=>m[s]=+d["m"+s]);
    const r=await call("POST","/checkout",{items:cart.items.map(i=>({productId:i.productId,quantity:i.quantity})),address:checkout.address,methods:m});
    location.hash="#/pay/"+r.order}
-  else if(k=="listing"){const body={title:d.title.trim(),categoryId:+d.categoryId,priceMinor:Math.round(d.price*100),qty:+d.qty,description:d.description,status:d.status};
+  else if(k=="listing"){const body={title:d.title.trim(),categoryId:+d.categoryId,priceMinor:Math.round(d.price*100),qty:+d.qty,description:d.description,status:d.status,imageUrl:(d.imageUrl??"").trim()};
    f.dataset.id=="new"?await call("POST","/seller/listings",body):await call("PUT","/seller/listings/"+f.dataset.id,body);
    location.hash="#/seller";toast("Listing saved")}
  })().catch(x=>{if(err)err.textContent=x.message;else toast(x.message)})});
