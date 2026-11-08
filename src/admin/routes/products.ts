@@ -22,6 +22,7 @@ interface ProductForm {
   description: string;
   asking_price: string;
   quantity_available: string;
+  image_url: string;
 }
 
 const categoryList = async () =>
@@ -47,6 +48,7 @@ function validateProduct(f: ProductForm, needSeller: boolean): string[] {
   if (f.title.length < 3) problems.push("Title must be at least 3 characters.");
   if (!/^\d{1,10}(\.\d{1,2})?$/.test(f.asking_price)) problems.push("Price must be a number with at most 2 decimals, e.g. 1500 or 1500.50.");
   if (!/^\d{1,6}$/.test(f.quantity_available)) problems.push("Stock must be a whole number from 0 to 999999.");
+  if (f.image_url && !/^https?:\/\//i.test(f.image_url)) problems.push("Image URL must start with http:// or https://.");
   return problems;
 }
 
@@ -59,6 +61,7 @@ const readForm = (req: Request): ProductForm => {
     description: str(b.description, 4000),
     asking_price: str(b.asking_price, 15),
     quantity_available: str(b.quantity_available, 7),
+    image_url: str(b.imageUrl, 500),
   };
 }
 
@@ -215,7 +218,7 @@ productsRouter.get(
 
 /* ---------- Add ---------- */
 
-const emptyForm: ProductForm = { seller_id: "", category_id: "", title: "", description: "", asking_price: "", quantity_available: "1" };
+const emptyForm: ProductForm = { seller_id: "", category_id: "", title: "", description: "", asking_price: "", quantity_available: "1", image_url: "" };
 
 productsRouter.get(
   "/new",
@@ -233,9 +236,9 @@ productsRouter.post(
     try {
       const id = await withTransaction(async (c) => {
         const r = await c.query<{ product_id: string }>(
-          `INSERT INTO product (seller_id, category_id, title, description, asking_price, quantity_available)
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING product_id`,
-          [form.seller_id, form.category_id, form.title, form.description || null, form.asking_price, form.quantity_available],
+          `INSERT INTO product (seller_id, category_id, title, description, asking_price, quantity_available, image_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING product_id`,
+          [form.seller_id, form.category_id, form.title, form.description || null, form.asking_price, form.quantity_available, form.image_url || null],
         );
         const pid = r.rows[0]?.product_id ?? null;
         await audit(c, req, "product.create", "product", pid, form.title);
@@ -256,9 +259,10 @@ async function loadProduct(id: string) {
   const { rows } = await query<{
     product_id: string; seller_id: string; seller: string; category_id: string; title: string;
     description: string | null; asking_price: string; quantity_available: number; listing_status: string;
+    image_url: string | null;
   }>(
     `SELECT p.product_id, p.seller_id, u.name AS seller, p.category_id, p.title, p.description,
-            p.asking_price, p.quantity_available, p.listing_status
+            p.image_url, p.asking_price, p.quantity_available, p.listing_status
      FROM product p JOIN app_user u ON u.user_id = p.seller_id WHERE p.product_id = $1`,
     [id],
   );
@@ -283,6 +287,7 @@ productsRouter.get(
         description: p.description ?? "",
         asking_price: p.asking_price,
         quantity_available: String(p.quantity_available),
+        image_url: p.image_url ?? "",
       },
     });
   }),
@@ -300,8 +305,8 @@ productsRouter.post(
     await withTransaction(async (c) => {
       await c.query(
         `UPDATE product SET category_id = $2, title = $3, description = $4, asking_price = $5,
-                quantity_available = $6, updated_at = now() WHERE product_id = $1`,
-        [id, form.category_id, form.title, form.description || null, form.asking_price, form.quantity_available],
+                quantity_available = $6, image_url = $7, updated_at = now() WHERE product_id = $1`,
+        [id, form.category_id, form.title, form.description || null, form.asking_price, form.quantity_available, form.image_url || null],
       );
       await audit(c, req, "product.update", "product", id, form.title);
     });

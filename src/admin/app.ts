@@ -42,6 +42,7 @@ adminApp.use(cookieParser());
 adminApp.use("/admin/static", express.static(path.resolve(process.cwd(), "src", "admin", "public")));
 
 // Display helpers available in every view
+adminApp.locals.currency = env.currency;
 adminApp.locals.money = (minor: string | number, cur = env.currency): string =>
   `${cur} ${(Number(minor) / 100).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 adminApp.locals.fmtDate = (d: string | Date): string => new Date(d).toLocaleString("en-KE");

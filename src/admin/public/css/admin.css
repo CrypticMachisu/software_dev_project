@@ -43,6 +43,9 @@ a:hover{color:var(--acc-deep)}
 .icon{width:20px;height:20px;flex:none;display:inline-block;vertical-align:-.2em}
 .btn .icon{width:16px;height:16px}
 .nav-item-link .icon{width:20px;height:20px}
+.image-preview{margin-top:.65rem;max-width:280px;border:1px solid var(--line);border-radius:12px;
+  overflow:hidden;background:var(--card)}
+.image-preview img{display:block;width:100%;height:170px;object-fit:cover}
 .soon{margin-left:auto;font-size:.65rem;font-weight:600;letter-spacing:.08em;
   text-transform:uppercase;color:var(--side-mute);border:1px solid currentColor;
   border-radius:999px;padding:.05rem .4rem}

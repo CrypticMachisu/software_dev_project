@@ -343,6 +343,8 @@ async function main() {
       const r = await admin.text(p);
       ok(`GET ${p} 200`, r.status === 200, `status ${r.status}`);
     }
+    const newProduct = await admin.text("/admin/products/new");
+    ok("Admin product form has image URL + preview", newProduct.status === 200 && newProduct.body.includes('name="imageUrl"') && newProduct.body.includes("data-image-preview"), `status ${newProduct.status}`);
     const sqli = await admin.text("/admin/users?q=%27%20OR%201%3D1--");
     ok("Admin search tolerates SQL-shaped input", sqli.status === 200);
     const xss = await admin.text("/admin/users?q=" + encodeURIComponent("<script>alert(1)</script>"));

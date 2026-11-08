@@ -27,8 +27,17 @@
         </select>
       </div>
       <div class="mb-3"><label class="form-label" for="description">Description</label><textarea class="form-control" id="description" name="description" rows="4" maxlength="4000"><%= form.description %></textarea></div>
+      <div class="mb-3">
+        <label class="form-label" for="imageUrl">Image URL <span class="text-muted small">(optional)</span></label>
+        <input class="form-control" type="url" id="imageUrl" name="imageUrl" maxlength="500" value="<%= form.image_url %>" placeholder="https://images.example.com/item.jpg">
+        <div class="form-text">Paste a public http(s) image link. Leave empty to show a placeholder tile.</div>
+        <div class="image-preview" data-image-preview-wrap <%= form.image_url ? '' : 'hidden' %>>
+          <img data-image-preview alt=""<% if (form.image_url) { %> src="<%= form.image_url %>"<% } %>>
+        </div>
+        <p class="text-muted small mt-2 mb-0" data-image-preview-empty <%= form.image_url ? 'hidden' : '' %>>No image selected.</p>
+      </div>
       <div class="row">
-        <div class="col-6 mb-3"><label class="form-label" for="asking_price">Price (KES)</label><input class="form-control" id="asking_price" name="asking_price" inputmode="decimal" value="<%= form.asking_price %>" required></div>
+        <div class="col-6 mb-3"><label class="form-label" for="asking_price">Price (<%= currency %>)</label><input class="form-control" id="asking_price" name="asking_price" inputmode="decimal" value="<%= form.asking_price %>" required></div>
         <div class="col-6 mb-3"><label class="form-label" for="quantity_available">Stock</label><input class="form-control" id="quantity_available" name="quantity_available" inputmode="numeric" value="<%= form.quantity_available %>" required></div>
       </div>
       <button class="btn btn-success"><%= productId ? 'Save changes' : 'Add product' %></button>
