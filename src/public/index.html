@@ -228,6 +228,16 @@ td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);ve
  .account-links .pill{width:100%;justify-content:flex-start}
 }
 
+/* ---- loading skeletons ---- */
+.skeleton{overflow:hidden}
+.sk-media{aspect-ratio:4/3;border-radius:calc(var(--r-lg) - 6px);background:var(--chip)}
+.sk-line{height:12px;border-radius:6px;background:var(--chip);margin-top:.6rem;width:80%}
+.sk-line.short{width:45%}
+@media(prefers-reduced-motion:no-preference){
+ .skeleton{animation:pulse 1.2s ease-in-out infinite alternate}
+ @keyframes pulse{from{opacity:.65}to{opacity:1}}
+}
+
 /* ---- cart + checkout ---- */
 .field-err{color:var(--bad);font-size:.82rem;margin:.25rem 0 0}
 input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 2px var(--bad-soft)}
@@ -364,7 +374,8 @@ function navbar(){const u=auth.user,n=cart.count();
  ${u?`<details class="account"${matchMedia("(min-width:761px)").matches?" open":""}><summary class="pill">${esc(u.name)}</summary><div class="account-links"><a class="pill" href="#/orders">My orders</a><a class="pill" href="#/seller">${auth.hasRole("seller")?"Sell":"Become a seller"}</a><a class="quiet" href="#" data-act="logout">Log out</a></div></details>`
  :`<span class="who">Browsing as guest</span><a class="pill" href="#/login">Log in</a>`}`}
 function needLogin(){if(auth.user)return false;location.hash="#/login?next="+encodeURIComponent(location.hash);return true}
-const errBox=(msg)=>`<div class="card empty"><h2>Something went wrong</h2><p class="mute">${esc(msg)}</p><a class="btn ghost" href="#/">Back to the market</a></div>`;
+const errBox=(msg)=>`<div class="card empty" role="alert"><h2>Something went wrong</h2><p class="mute">${esc(msg)}</p><div class="row"><button data-act="retry">Try again</button><a class="btn ghost" href="#/">Back to the market</a></div></div>`;
+const skeletonGrid=()=>`<div class="grid" aria-hidden="true">${Array.from({length:8},()=>`<div class="card skeleton"><div class="sk-media"></div><div class="sk-line"></div><div class="sk-line short"></div></div>`).join("")}</div>`;
 
 const V={};
 V.login=(a,q)=>`<div class="card" style="max-width:400px;margin:2rem auto"><h1>Welcome</h1>
@@ -481,6 +492,7 @@ V.edit=async([id])=>{const isNew=id=="new";
 
 /* ===== Click Actions and Event Listeners ===== */
 const A={
+ retry(){route()},
  async logout(){await auth.logout();navbar();route()},
  mode(e){state.mode=e.dataset.m;route()},
  cat(e){catalog.categoryId=+e.dataset.id;keepScroll=true;route()},
@@ -588,7 +600,7 @@ async function route(){const [path,qs]=(location.hash.slice(1)||"/").split("?"),
  if(authed.includes(name)&&needLogin())return;
  if(name=="edit"&&!auth.hasRole("seller")){location.hash="#/seller";return}
  const previousScroll=window.scrollY;
- navbar();$("#app").innerHTML='<div class="mute" style="opacity:.6">Loading…</div>';
+ navbar();$("#app").innerHTML=name==="browse"?skeletonGrid():'<div class="card empty" role="status"><p class="mute">Loading…</p></div>';
  try{$("#app").innerHTML=await (V[name]||(()=>"<p>Page not found.</p>"))(name=="login"?state:args,q)
   if(window.matchMedia("(max-width:879px)").matches){const fd=$(".filters");if(fd)fd.open=false}}
  catch(x){$("#app").innerHTML=errBox(x.message)}
