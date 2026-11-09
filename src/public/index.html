@@ -200,6 +200,34 @@ td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);ve
   background:var(--ink);color:var(--bg);padding:.55rem 1.2rem;border-radius:999px;
   font-size:.9rem;z-index:30;box-shadow:var(--shadow);animation:rise .3s cubic-bezier(.32,.72,0,1)}
 
+/* ---- browse ---- */
+.browse-head{display:flex;align-items:end;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem}
+.browse-head h1{margin:0}
+.sort-label{display:flex;align-items:center;gap:.4rem;font-size:.8rem;font-weight:600;color:var(--mute)}
+.sort-label select{width:auto}
+.filters>summary{display:none}
+.active-filters{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem}
+.product-card{padding:.55rem .55rem 1rem;display:flex;flex-direction:column;gap:.15rem}
+.product-card .card-link:hover{text-decoration:none}
+.product-title{font:600 1rem/1.35 "Instrument Sans",system-ui,sans-serif;color:var(--ink);margin:.55rem 0 .1rem}
+.product-card .seller{font-size:.8rem}
+@media(max-width:879px){
+ .layout{grid-template-columns:1fr}
+ .filters{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:.4rem .8rem}
+ .filters>summary{display:flex;align-items:center;justify-content:space-between;min-height:44px;font-weight:600;cursor:pointer}
+ .filters aside{border:0;padding:0 0 .6rem;background:none;position:static}
+}
+.account{position:relative}
+.account>summary{list-style:none;cursor:pointer}
+.account>summary::-webkit-details-marker{display:none}
+.account-links{display:flex;gap:.6rem;align-items:center}
+@media(min-width:761px){.account>summary{display:none}}
+@media(max-width:760px){
+ .account-links{position:absolute;right:0;top:calc(100% + .45rem);min-width:190px;display:grid;gap:.35rem;
+  padding:.5rem;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);z-index:10}
+ .account-links .pill{width:100%;justify-content:flex-start}
+}
+
 /* ---- entry motion ---- */
 @media(prefers-reduced-motion:no-preference){
   main{animation:rise .5s cubic-bezier(.32,.72,0,1) both}
@@ -274,6 +302,7 @@ const auth={
  async becomeSeller(){const {user}=await call("POST","/roles/seller");db.user=user}};
 const cart=new Cart();
 const catalog={query:"",categoryId:0,min:"",max:"",sort:"new"};
+let keepScroll=false;
 const checkout={address:store.get("mkt_addr",{}),methods:{}};
 const STEPS=["pending","confirmed","shipped","completed"],
  LABEL={pending:"New",confirmed:"Confirmed",shipped:"Shipped",completed:"Completed",cancelled:"Cancelled",refunded:"Refunded",partially_refunded:"Partially refunded"};
@@ -284,7 +313,7 @@ function navbar(){const u=auth.user,n=cart.count();
  $("#nav").innerHTML=`<a class="brand" href="#/">M-DUKA</a><span class="brand-sub">Multi-seller<br>market</span>
  <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search the market…" value="${esc(catalog.query)}" aria-label="Search products"></label><span class="sp"></span>
  <a class="pill" href="#/cart">Cart${n?`<span class="badge">${n}</span>`:""}</a>
- ${u?`<a class="pill" href="#/orders">My orders</a><a class="pill" href="#/seller">${auth.hasRole("seller")?"Sell":"Become a seller"}</a><span class="who">${esc(u.name)}</span><a class="quiet" href="#" data-act="logout">Log out</a>`
+ ${u?`<details class="account"${matchMedia("(min-width:761px)").matches?" open":""}><summary class="pill">${esc(u.name)}</summary><div class="account-links"><a class="pill" href="#/orders">My orders</a><a class="pill" href="#/seller">${auth.hasRole("seller")?"Sell":"Become a seller"}</a><a class="quiet" href="#" data-act="logout">Log out</a></div></details>`
  :`<span class="who">Browsing as guest</span><a class="pill" href="#/login">Log in</a>`}`}
 function needLogin(){if(auth.user)return false;location.hash="#/login?next="+encodeURIComponent(location.hash);return true}
 const errBox=(msg)=>`<div class="card empty"><h2>Something went wrong</h2><p class="mute">${esc(msg)}</p><a class="btn ghost" href="#/">Back to the market</a></div>`;
@@ -296,17 +325,35 @@ V.login=(a,q)=>`<div class="card" style="max-width:400px;margin:2rem auto"><h1>W
  <label>Email</label><input name="email" type="email" required placeholder="jane@example.com"><label>Password</label><input name="pw" type="password" required minlength="8" placeholder="password123">
  <div class="err" id="err"></div><button style="width:100%">${a.mode=="reg"?"Create account":"Log in"}</button></form>
  <p class="mute">Demo accounts: jane@example.com (buyer) · sam@example.com (seller), password123.</p></div>`;
-V.browse=()=>{const f=catalog,base=db.products;let ps=base.filter(p=>(!f.categoryId||p.categoryId==f.categoryId)&&(!f.query||p.title.toLowerCase().includes(f.query.toLowerCase()))&&(f.min===""||p.priceMinor>=f.min*100)&&(f.max===""||p.priceMinor<=f.max*100));
+let browsePainted=false;
+V.browse=()=>{
+ const f=catalog,base=db.products;
+ let ps=base.filter(p=>(!f.categoryId||p.categoryId==f.categoryId)&&(!f.query||p.title.toLowerCase().includes(f.query.toLowerCase()))&&(f.min===""||p.priceMinor>=f.min*100)&&(f.max===""||p.priceMinor<=f.max*100));
  ps.sort((a,b)=>f.sort=="lo"?a.priceMinor-b.priceMinor:f.sort=="hi"?b.priceMinor-a.priceMinor:b.id-a.id);
- const cnt=id=>base.filter(p=>!id||p.categoryId==id).length,dirty=!!(f.categoryId||f.query||f.min!==""||f.max!=="");
- return `<h1>Browse the market</h1><div class="layout"><aside aria-label="Filters"><h3>Categories</h3><div class="fcats">
- <a class="fcat ${f.categoryId?"":"on"}" href="#" data-act="cat" data-id="0"><span>All</span><span class="cnt">${cnt(0)}</span></a>
- ${db.categories.map(c=>`<a class="fcat ${f.categoryId==c.id?"on":""}" href="#" data-act="cat" data-id="${c.id}"><span>${esc(c.name)}</span><span class="cnt">${cnt(c.id)}</span></a>`).join("")}</div>
- <h3>Price (${CURRENCY})</h3><div class="prange"><input id="min" inputmode="numeric" placeholder="Min" maxlength="7" value="${esc(f.min)}" aria-label="Minimum price"><span class="dash">–</span><input id="max" inputmode="numeric" placeholder="Max" maxlength="7" value="${esc(f.max)}" aria-label="Maximum price"></div>
- <div class="fbtns"><button class="sm" data-act="price">Apply</button>${dirty?`<button class="sm ghost" data-act="clearf">Reset</button>`:""}</div>
- <p class="fhint mute">Tip: press Enter in a field to apply.</p></aside>
- <section><div class="row"><span class="mute">${ps.length} result${ps.length==1?"":"s"}</span><span class="sp"></span><select id="sort" style="width:auto"><option value="new">Newest</option><option value="lo" ${f.sort=="lo"?"selected":""}>Price: low to high</option><option value="hi" ${f.sort=="hi"?"selected":""}>Price: high to low</option></select></div>
- ${ps.length?`<div class="grid" style="margin-top:.8rem">${ps.map(p=>`<div class="card"><a href="#/product/${p.id}">${media(p)}</a><div style="margin-top:.5rem"><a href="#/product/${p.id}">${esc(p.title)}</a></div><div class="row"><span class="price">${money(p.priceMinor)}</span><span class="sp"></span><button class="sm" data-act="add" data-id="${p.id}">Add</button></div><div class="mute">Sold by ${esc(p.sellerName??full(p.sellerId)?.sellerName??"Seller")}</div></div>`).join("")}</div>`:`<div class="card empty"><h2>Nothing matches just yet</h2><p class="mute">Widen the price range, clear the search, or try another category.</p><button class="sm ghost" data-act="clearf">Clear all filters</button></div>`}</section></div>`};
+ const cnt=id=>base.filter(p=>!id||p.categoryId==id).length;
+ const dirty=!!(f.categoryId||f.query||f.min!==""||f.max!=="");
+ const seller=p=>p.sellerName??full(p.sellerId)?.sellerName??"Seller";
+ const card=p=>`<article class="card product-card"><a class="card-link" href="#/product/${p.id}">${media(p)}<h2 class="product-title">${esc(p.title)}</h2></a><p class="mute seller">Sold by ${esc(seller(p))}</p><div class="row"><span class="price">${money(p.priceMinor)}</span><span class="sp"></span><button class="sm" data-act="add" data-id="${p.id}" aria-label="Add ${esc(p.title)} to cart">Add</button></div></article>`;
+ const active=[f.categoryId?`<span class="chip">${esc(db.categories.find(c=>c.id==f.categoryId)?.name??"Category")}</span>`:"",f.query?`<span class="chip">Search: ${esc(f.query)}</span>`:"",(f.min!==""||f.max!=="")?`<span class="chip">${f.min!==""?money(f.min*100):"Any"} – ${f.max!==""?money(f.max*100):"Any"}</span>`:""].filter(Boolean);
+ const stagger=browsePainted?"":" stagger";browsePainted=true;
+ return `<div class="layout">
+ <details class="filters"${matchMedia("(min-width:880px)").matches?" open":""}>
+  <summary>Filters <span class="mute">${ps.length} result${ps.length===1?"":"s"}</span></summary>
+  <aside aria-label="Filters"><h3>Categories</h3><div class="fcats">
+   <a class="fcat ${f.categoryId?"":"on"}" href="#" data-act="cat" data-id="0"><span>All</span><span class="cnt">${cnt(0)}</span></a>
+   ${db.categories.map(c=>`<a class="fcat ${f.categoryId==c.id?"on":""}" href="#" data-act="cat" data-id="${c.id}"><span>${esc(c.name)}</span><span class="cnt">${cnt(c.id)}</span></a>`).join("")}
+  </div>
+  <h3>Price (${CURRENCY})</h3><div class="prange"><input id="min" inputmode="numeric" placeholder="Min" maxlength="7" value="${esc(f.min)}" aria-label="Minimum price"><span class="dash">–</span><input id="max" inputmode="numeric" placeholder="Max" maxlength="7" value="${esc(f.max)}" aria-label="Maximum price"></div>
+  <div class="fbtns"><button class="sm" data-act="price">Apply</button>${dirty?`<button class="sm ghost" data-act="clearf">Reset</button>`:""}</div>
+  <p class="fhint mute">Press Enter in a price field to apply.</p></aside>
+ </details>
+ <section aria-labelledby="browse-title">
+  <div class="browse-head"><div><h1 id="browse-title">Browse the market</h1><p class="mute">${ps.length} result${ps.length===1?"":"s"}</p></div>
+  <label class="sort-label" for="sort">Sort</label><select id="sort"><option value="new">Newest</option><option value="lo" ${f.sort=="lo"?"selected":""}>Price: low to high</option><option value="hi" ${f.sort=="hi"?"selected":""}>Price: high to low</option></select></div>
+  ${active.length?`<div class="active-filters">${active.join("")}</div>`:""}
+  ${ps.length?`<div class="grid${stagger}">${ps.map(card).join("")}</div>`:`<div class="card empty"><h2>Nothing matches yet</h2><p class="mute">Widen the price range, clear the search, or try another category.</p><button class="sm ghost" data-act="clearf">Clear all filters</button></div>`}
+ </section></div>`;
+};
 V.product=async([id])=>{const d=await api("/products/"+encodeURIComponent(id));const p=d.product;if(!p)return"<p>Product not found.</p>";
  const rv=d.reviews??[],rate=d.sellerRating?`${stars(d.sellerRating.avg)} ${d.sellerRating.avg.toFixed(1)} (${d.sellerRating.n})`:"No reviews yet";
  return `<p class="mute"><a href="#/">Browse</a> › ${esc(p.categoryName)}</p><div class="two" style="grid-template-columns:1fr 1fr">${media(p,true)}<div>
@@ -365,9 +412,11 @@ V.edit=async([id])=>{const isNew=id=="new";
 const A={
  async logout(){await auth.logout();navbar();route()},
  mode(e){state.mode=e.dataset.m;route()},
- cat(e){catalog.categoryId=+e.dataset.id;route()},
- price(){catalog.min=$("#min").value;catalog.max=$("#max").value;route()},
- clearf(){catalog.query="";catalog.categoryId=0;catalog.min="";catalog.max="";route()},
+ cat(e){catalog.categoryId=+e.dataset.id;keepScroll=true;route()},
+ price(){catalog.min=$("#min").value;catalog.max=$("#max").value;keepScroll=true;route()},
+ clearf(){catalog.query="";catalog.categoryId=0;catalog.min="";catalog.max="";keepScroll=true;
+  if(location.hash.includes("?")){location.hash="#/";return}
+  route()},
  add(e){const q=e.hasAttribute("data-qty")?+$("#qty").value:1;cart.addItem(+e.dataset.id,q);navbar();if(cart.items.some(i=>i.productId==+e.dataset.id))toast("Added to cart")},
  buy(e){cart.addItem(+e.dataset.id,+$("#qty").value||1);if(cart.items.length)location.hash="#/cart"},
  qty(e){cart.updateQuantity(+e.dataset.id,e.value);route()},
@@ -421,9 +470,14 @@ const A={
 };
 const state={mode:"login"};
 document.addEventListener("click",ev=>{const e=ev.target.closest("[data-act]");if(!e||e.tagName=="INPUT")return;ev.preventDefault();A[e.dataset.act]?.(e)});
-document.addEventListener("change",ev=>{if(ev.target.dataset.act=="qty")A.qty(ev.target);if(ev.target.id=="sort"){catalog.sort=ev.target.value;route()}});
+document.addEventListener("change",ev=>{if(ev.target.dataset.act=="qty")A.qty(ev.target);if(ev.target.id=="sort"){catalog.sort=ev.target.value;keepScroll=true;route()}});
 document.addEventListener("keydown",ev=>{const id=ev.target.id;if(ev.key!="Enter")return;
- if(id=="q"){catalog.query=ev.target.value;if(location.hash!="#/")location.hash="#/";route()}
+ if(id=="q"){
+  const term=ev.target.value.trim();
+  catalog.query=term;
+  const next=term?`#/?q=${encodeURIComponent(term)}`:"#/";
+  if(location.hash!==next)location.hash=next;else route();
+ }
  if(id=="min"||id=="max")A.price()});
 document.addEventListener("submit",ev=>{const f=ev.target,k=f.dataset.form;if(!k)return;ev.preventDefault();
  const d=Object.fromEntries(new FormData(f));const errs=f.querySelectorAll(".err"),err=errs[errs.length-1]||document.getElementById("err");
@@ -442,12 +496,16 @@ document.addEventListener("submit",ev=>{const f=ev.target,k=f.dataset.form;if(!k
 async function route(){const [path,qs]=(location.hash.slice(1)||"/").split("?"),q=Object.fromEntries(new URLSearchParams(qs||"")),seg=path.split("/").filter(Boolean);
  const authed=["cart","checkout","orders","seller","pay","result"];let name=seg[0]||"browse",args=seg.slice(1);
  if(name=="seller"&&seg[1]=="edit"){name="edit";args=seg.slice(2)}
+ if(name=="browse"&&typeof q.q=="string")catalog.query=q.q;
  if(authed.includes(name)&&needLogin())return;
  if(name=="edit"&&!auth.hasRole("seller")){location.hash="#/seller";return}
+ const previousScroll=window.scrollY;
  navbar();$("#app").innerHTML='<div class="mute" style="opacity:.6">Loading…</div>';
- try{$("#app").innerHTML=await (V[name]||(()=>"<p>Page not found.</p>"))(name=="login"?state:args,q)}
+ try{$("#app").innerHTML=await (V[name]||(()=>"<p>Page not found.</p>"))(name=="login"?state:args,q)
+  if(window.matchMedia("(max-width:879px)").matches){const fd=$(".filters");if(fd)fd.open=false}}
  catch(x){$("#app").innerHTML=errBox(x.message)}
- window.scrollTo(0,0)}
+ if(keepScroll)window.scrollTo(0,previousScroll);else window.scrollTo(0,0);
+ keepScroll=false}
 
 /* ===== Boot: pull a fresh snapshot from the Postgres-backed API ===== */
 (async function boot(){

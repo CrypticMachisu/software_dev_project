@@ -98,6 +98,8 @@ async function main() {
     ok("Seller listing form exposes an image URL", root.body.includes('name="imageUrl"') && root.body.includes("Image URL (optional)"));
     ok("Review dialog is announced", root.body.includes('setAttribute("role","dialog")') && root.body.includes('setAttribute("aria-modal","true")'));
     ok("Toasts are live regions", root.body.includes('setAttribute("role","status")') && root.body.includes('setAttribute("aria-live","polite")'));
+    ok("Browse has a mobile filter drawer", root.body.includes('class="filters"') && root.body.includes("<summary>"));
+    ok("Browse cards expose a product link and add control", root.body.includes("product-card") && root.body.includes('data-act="add"'));
   }
 
   section("2. Catalogue");
