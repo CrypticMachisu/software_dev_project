@@ -100,6 +100,8 @@ async function main() {
     ok("Toasts are live regions", root.body.includes('setAttribute("role","status")') && root.body.includes('setAttribute("aria-live","polite")'));
     ok("Browse has a mobile filter drawer", root.body.includes('class="filters"') && root.body.includes("<summary>"));
     ok("Browse cards expose a product link and add control", root.body.includes("product-card") && root.body.includes('data-act="add"'));
+    ok("Product page has a buy box and trust row", root.body.includes("buybox") && root.body.includes("Buyer protection"));
+    ok("Product page has a mobile buy bar", root.body.includes("mobile-buy"));
   }
 
   section("2. Catalogue");

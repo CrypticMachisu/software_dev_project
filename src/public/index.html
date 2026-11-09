@@ -228,6 +228,28 @@ td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);ve
  .account-links .pill{width:100%;justify-content:flex-start}
 }
 
+/* ---- product page ---- */
+.crumbs{display:flex;gap:.45rem;align-items:center;font-size:.85rem;margin-bottom:.8rem}
+.product-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:1.7rem;align-items:start}
+.product-media{position:sticky;top:4.6rem}
+.buybox{position:sticky;top:4.6rem}
+.buybox h1{margin-top:0}
+.price.big{font-size:1.5rem}
+.method-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin:.7rem 0}
+.buy-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem}
+.trust{list-style:none;padding:0;margin:1rem 0 0;display:grid;gap:.3rem;font-size:.84rem;color:var(--mute)}
+.trust li::before{content:"✓";color:var(--go);margin-right:.45rem}
+.product-detail{max-width:65ch;margin-top:1.8rem}
+.product-detail p{overflow-wrap:anywhere}
+.stars-static{color:var(--star)}
+@media(max-width:880px){
+ .product-layout{grid-template-columns:1fr}
+ .product-media,.buybox{position:static}
+ .mobile-buy{display:flex;position:sticky;bottom:0;z-index:6;align-items:center;gap:.8rem;
+   padding:.7rem 1rem;background:var(--card);border-top:1px solid var(--line)}
+ .mobile-buy .price{flex:1}
+}
+
 /* ---- entry motion ---- */
 @media(prefers-reduced-motion:no-preference){
   main{animation:rise .5s cubic-bezier(.32,.72,0,1) both}
@@ -354,13 +376,32 @@ V.browse=()=>{
   ${ps.length?`<div class="grid${stagger}">${ps.map(card).join("")}</div>`:`<div class="card empty"><h2>Nothing matches yet</h2><p class="mute">Widen the price range, clear the search, or try another category.</p><button class="sm ghost" data-act="clearf">Clear all filters</button></div>`}
  </section></div>`;
 };
-V.product=async([id])=>{const d=await api("/products/"+encodeURIComponent(id));const p=d.product;if(!p)return"<p>Product not found.</p>";
- const rv=d.reviews??[],rate=d.sellerRating?`${stars(d.sellerRating.avg)} ${d.sellerRating.avg.toFixed(1)} (${d.sellerRating.n})`:"No reviews yet";
- return `<p class="mute"><a href="#/">Browse</a> › ${esc(p.categoryName)}</p><div class="two" style="grid-template-columns:1fr 1fr">${media(p,true)}<div>
- <h1>${esc(p.title)}</h1><div class="price" style="font-size:1.4rem">${money(p.priceMinor)}</div><p class="mute">Sold by ${esc(p.sellerName)} · ${rate}</p><p>${p.qty?`In stock: ${p.qty}`:'<span class="chip bad">Sold out</span>'}</p>
- <p>${db.methods.map(m=>`<span class="chip">${esc(m.name)}</span>`).join(" ")}</p><label>Quantity</label><input id="qty" type="number" min="1" max="${p.qty}" value="1" style="width:90px">
- <div class="row" style="margin-top:.8rem"><button data-act="add" data-id="${p.id}" data-qty ${p.qty?"":"disabled"}>Add to cart</button><button class="ghost" data-act="buy" data-id="${p.id}" ${p.qty?"":"disabled"}>Buy now</button></div>
- <h3 style="margin-top:1.2rem">Description</h3><p>${esc(p.description)}</p><h3>Seller reviews</h3>${rv.map(r=>`<p><span style="color:#f5b301">${stars(r.rating)}</span> ${esc(r.comment||"")}${r.buyerName?` <span class="mute">— ${esc(r.buyerName)}</span>`:""}</p>`).join("")||'<p class="mute">No reviews yet.</p>'}</div></div>`};
+V.product=async([id])=>{
+ const d=await api("/products/"+encodeURIComponent(id));
+ const p=d.product;
+ if(!p)return"<p>Product not found.</p>";
+ const rv=d.reviews??[];
+ const rate=d.sellerRating?`${stars(d.sellerRating.avg)} ${d.sellerRating.avg.toFixed(1)} (${d.sellerRating.n})`:"No reviews yet";
+ const disabled=p.qty?"":" disabled";
+ return `<nav class="crumbs" aria-label="Breadcrumb"><a href="#/">Browse</a><span aria-hidden="true">›</span><span>${esc(p.categoryName)}</span></nav>
+ <div class="product-layout">
+  <div class="product-media">${media(p,true)}</div>
+  <div class="buybox card">
+   <h1>${esc(p.title)}</h1>
+   <div class="price big">${money(p.priceMinor)}</div>
+   <p class="mute">Sold by ${esc(p.sellerName)} · ${rate}</p>
+   <p><span class="chip ${p.qty?"ok":"bad"}">${p.qty?`In stock: ${p.qty}`:"Sold out"}</span></p>
+   <div class="method-chips">${db.methods.map(m=>`<span class="chip">${esc(m.name)}</span>`).join("")}</div>
+   <label for="qty">Quantity</label><input id="qty" type="number" min="1" max="${p.qty}" value="1">
+   <div class="buy-actions"><button data-act="add" data-id="${p.id}" data-qty${disabled}>Add to cart</button><button class="ghost" data-act="buy" data-id="${p.id}"${disabled}>Buy now</button></div>
+   <ul class="trust"><li>Buyer protection</li><li>Pickup or delivery</li><li>Refunds via support</li></ul>
+  </div>
+ </div>
+ <div class="product-detail"><h2>Description</h2><p>${esc(p.description)}</p><h2>Seller reviews</h2>
+  ${rv.map(r=>`<p><span class="stars-static" aria-label="${r.rating} out of 5">${stars(r.rating)}</span> ${esc(r.comment||"")}${r.buyerName?` <span class="mute">— ${esc(r.buyerName)}</span>`:""}</p>`).join("")||'<p class="mute">No reviews yet.</p>'}
+ </div>
+ <div class="mobile-buy"><span class="price">${money(p.priceMinor)}</span><button data-act="add" data-id="${p.id}" data-qty${disabled}>Add to cart</button></div>`;
+};
 V.cart=()=>{const g=cart.groupBySeller();if(!cart.items.length)return'<div class="card"><h1>Your cart is empty</h1><a href="#/">Find something to buy</a></div>';
  return `<h1>Shopping cart (${cart.count()} items)</h1><div class="two"><div>${Object.entries(g).map(([s,its])=>`<div class="group">Seller: ${esc(full(s)?.sellerName??"Seller")}</div>${its.map(i=>`<div class="card row" style="margin-bottom:.4rem">${media({title:i.titleSnapshot,imageUrl:i.imageUrl})}<span class="sp"><a href="#/product/${i.productId}">${esc(i.titleSnapshot)}</a><br><span class="mute">${money(i.unitPriceMinor)} each</span></span><input type="number" min="1" style="width:70px" value="${i.quantity}" data-act="qty" data-id="${i.productId}"><span class="price">${money(i.lineTotalMinor())}</span><button class="sm ghost" data-act="rm" data-id="${i.productId}" aria-label="Remove">✕</button></div>`).join("")}`).join("")}</div>
  <div class="card"><h2>Order summary</h2><div class="row"><span>Subtotal</span><span class="sp"></span><span>${money(cart.subtotalMinor())}</span></div><p class="mute">Items ship separately per seller. The final total is confirmed by the server.</p><a class="btn" style="display:block;text-align:center" href="#/checkout">Checkout</a></div></div>`};
