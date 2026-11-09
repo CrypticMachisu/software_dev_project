@@ -140,6 +140,9 @@ aside .fhint{margin-top:.55rem;font-size:.76rem}
 .price{font-family:Fraunces,Georgia,serif;font-weight:620;font-size:1.08rem;font-variant-numeric:tabular-nums}
 
 /* ---- seller analytics ---- */
+.seller-stats .card{flex:1 1 150px}
+.seller-stats .stat-card{background:var(--acc-soft);border-color:var(--acc)}
+.seller-stats h2{margin:.15rem 0 0;font-size:1.55rem}
 .bars{display:flex;align-items:flex-end;gap:.4rem;height:96px;margin-top:.7rem}
 .bars .b{flex:1;min-height:3px;background:linear-gradient(180deg,var(--acc),var(--acc-soft));
   border-radius:5px 5px 2px 2px;transition:opacity .2s}
@@ -470,9 +473,15 @@ V.seller=async()=>{const u=auth.user;if(!u)return "<p>Sign in first.</p>";
  const btnFor=s=>({pending:`<button class="sm" data-act="so" data-do="seller:confirm" data-id="${s.id}">Confirm</button> <button class="sm ghost" data-act="so" data-do="seller:decline" data-id="${s.id}">Decline</button>`,
   confirmed:`<button class="sm" data-act="ship" data-id="${s.id}">Mark shipped</button>`,
   shipped:`<span class="chip">Shipped${s.tracking?`: ${esc(s.tracking)}`:""}</span>`,
-  completed:completed.includes(s)?(s.release!="not_eligible"?'<span class="chip warn">Refund requested</span>':'<span class="chip ok">Order complete</span>'):""}[s.fulfillment]??"");
+  completed:s.fulfillment==="completed"?(s.release!="not_eligible"?'<span class="chip warn">Refund requested</span>':'<span class="chip ok">Order complete</span>'):""}[s.fulfillment]??"");
  return `<h1>Seller dashboard</h1><div class="row" style="margin-bottom:1.2rem"><a class="btn" href="#/seller/edit/new">New listing</a></div>
- <div class="row" style="margin-bottom:1.2rem"><div class="card"><div class="mute">Completed revenue</div><h2>${money(st.revenueMinor)}</h2></div><div class="card"><div class="mute">Units sold</div><h2>${st.unitsSold}</h2></div><div class="card"><div class="mute">Open orders</div><h2>${st.openOrders}</h2></div><div class="card"><div class="mute">Awaiting you</div><h2>${st.awaitingAction}</h2></div><div class="card"><div class="mute">Active listings</div><h2>${mine.filter(p=>p.status=="active").length}</h2></div></div>
+ <div class="row seller-stats" style="margin-bottom:1.2rem">
+ <div class="card stat-card"><div class="mute">Awaiting you</div><h2>${st.awaitingAction}</h2></div>
+ <div class="card"><div class="mute">Completed revenue</div><h2>${money(st.revenueMinor)}</h2></div>
+ <div class="card"><div class="mute">Units sold</div><h2>${st.unitsSold}</h2></div>
+ <div class="card"><div class="mute">Open orders</div><h2>${st.openOrders}</h2></div>
+ <div class="card"><div class="mute">Active listings</div><h2>${mine.filter(p=>p.status=="active").length}</h2></div>
+</div>
  <div class="card" style="margin-bottom:1rem"><div class="row"><h3 class="sp">Completed sales · last 14 days</h3><span class="mute">${st.completedOrders} order(s)</span></div><div class="bars">${st.daily.map(d=>`<div class="b" style="height:${Math.max(3,Math.round(d.revenueMinor/maxDay*90))}%" title="${d.day}: ${money(d.revenueMinor)}"></div>`).join("")}</div><div class="row mute" style="justify-content:space-between;margin-top:.3rem"><span>${st.daily[0]?.day??""}</span><span>${st.daily[st.daily.length-1]?.day??""}</span></div>
  ${st.top.length?`<h3 style="margin-top:1rem">Top listings · 30 days</h3>${st.top.map(t=>`<div class="row" style="border-top:1px solid var(--line-2);padding:.35rem 0"><span class="sp">${esc(t.title)}</span><span class="mute">${t.units} sold</span><span class="price">${money(t.revenueMinor)}</span></div>`).join("")}`:'<p class="mute">No completed sales yet.</p>'}</div>
  <h2>Incoming orders</h2><div class="card" style="overflow-x:auto;margin-bottom:1rem"><table><tr><th>Seller order</th><th>Buyer</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr>
