@@ -23,6 +23,8 @@
   --r-lg:18px; --r-sm:10px;
   --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;
   --t-xs:12px;--t-sm:14px;--t-md:16px;--t-lg:20px;--t-xl:25px;--t-2xl:31px;--t-3xl:39px;
+  --ease:cubic-bezier(.2,.7,.2,1);
+  --dur-1:120ms; --dur-2:180ms; --dur-3:240ms;
 }
 @media(prefers-color-scheme:dark){
   :root{
@@ -124,19 +126,19 @@ aside .fhint{margin-top:.55rem;font-size:.76rem}
 
 /* ---- product grid ---- */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:1.05rem}
-.grid>.card{padding:.55rem .55rem 1rem;border-radius:var(--r-lg);
-  transition:transform .35s cubic-bezier(.32,.72,0,1),box-shadow .3s .03s cubic-bezier(.32,.72,0,1)}
+.grid>.card{padding:.55rem .55rem 1rem;border-radius:var(--r-lg);transition:box-shadow var(--dur-2) var(--ease)}
 .grid>.card a:hover{text-decoration:none}
 @media(hover:hover){.grid>.card:hover a{text-decoration:underline}}
+@media(hover:hover) and (pointer:fine){
+ .grid>.card:hover{transform:translateY(-2px);box-shadow:var(--shadow);transition:transform 140ms var(--ease),box-shadow 140ms var(--ease)}
+ .product-card .card-link:hover .media{transform:scale(1.02)}
+}
 .media{position:relative;aspect-ratio:4/3;overflow:hidden;border-radius:calc(var(--r-lg) - 6px);background:var(--chip)}
 .media.big{aspect-ratio:4/5;border-radius:var(--r-lg)}
 .media svg{position:absolute;inset:0;width:100%;height:100%}
 .media img{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover}
 .card.row>.media{width:64px;flex:none;aspect-ratio:1;border-radius:10px}
 .table .media{width:56px;aspect-ratio:1;border-radius:8px}
-@media(hover:hover){
-@media(prefers-reduced-motion:no-preference){.grid>.card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}}
-}
 .price{font-family:Fraunces,Georgia,serif;font-weight:620;font-size:1.08rem;font-variant-numeric:tabular-nums}
 
 /* ---- seller analytics ---- */
@@ -151,10 +153,10 @@ aside .fhint{margin-top:.55rem;font-size:.76rem}
 /* ---- buttons ---- */
 .btn,button{font:inherit;font-weight:600;padding:.55rem 1.15rem;border-radius:999px;
   border:1px solid var(--acc);background:var(--acc);color:var(--acc-ink);cursor:pointer;
-  transition:transform .22s cubic-bezier(.32,.72,0,1),background .22s,box-shadow .22s,border-color .22s}
+  transition:transform 90ms var(--ease),background var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease)}
 .btn:hover,button:hover{background:var(--acc-deep);border-color:var(--acc-deep);
   transform:translateY(-1px);box-shadow:var(--shadow-soft);text-decoration:none;color:var(--acc-ink)}
-.btn:active,button:active{transform:scale(.97);box-shadow:none}
+.btn:active,button:active{transform:scale(.985);box-shadow:none}
 .btn.ghost,button.ghost{background:transparent;color:var(--acc);border-color:var(--acc)}
 .btn.ghost:hover,button.ghost:hover{background:var(--acc-soft);color:var(--acc);transform:translateY(-1px)}
 button.sm{padding:.3rem .75rem;font-size:.85rem}
@@ -201,7 +203,7 @@ td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);ve
 .stars button{background:none;border:none;padding:0 .1rem;color:var(--star);font-size:1.8rem}
 .toast{position:fixed;bottom:1.1rem;left:50%;transform:translateX(-50%);
   background:var(--ink);color:var(--bg);padding:.55rem 1.2rem;border-radius:999px;
-  font-size:.9rem;z-index:30;box-shadow:var(--shadow);animation:rise .3s cubic-bezier(.32,.72,0,1)}
+  font-size:.9rem;z-index:30;box-shadow:var(--shadow);animation:rise 140ms var(--ease)}
 
 /* ---- browse ---- */
 .browse-head{display:flex;align-items:end;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem}
@@ -278,18 +280,21 @@ input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="tr
 
 /* ---- entry motion ---- */
 @media(prefers-reduced-motion:no-preference){
-  main{animation:rise .5s cubic-bezier(.32,.72,0,1) both}
-  .grid>.card{animation:rise .55s cubic-bezier(.32,.72,0,1) both}
-  .grid>.card:nth-child(2){animation-delay:.05s}
-  .grid>.card:nth-child(3){animation-delay:.1s}
-  .grid>.card:nth-child(4){animation-delay:.15s}
-  .grid>.card:nth-child(5){animation-delay:.2s}
-  .grid>.card:nth-child(6){animation-delay:.25s}
-  .grid>.card:nth-child(7){animation-delay:.3s}
-  .grid>.card:nth-child(8){animation-delay:.35s}
-  .grid>.card:nth-child(n+9){animation-delay:.4s}
-  @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-  @keyframes fade{from{opacity:0}to{opacity:1}}
+ .grid.stagger>.card{animation:rise var(--dur-3) var(--ease) both}
+ .grid.stagger>.card:nth-child(2){animation-delay:24ms}
+ .grid.stagger>.card:nth-child(3){animation-delay:48ms}
+ .grid.stagger>.card:nth-child(4){animation-delay:72ms}
+ @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+ @keyframes fade{from{opacity:0}to{opacity:1}}
+ ::view-transition-old(root){animation:fade 160ms var(--ease) both reverse}
+ ::view-transition-new(root){animation:fade 160ms var(--ease) both}
+ .filters[open] aside{animation:drawer var(--dur-2) var(--ease)}
+ @keyframes drawer{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+ html{scroll-behavior:auto}
+ ::view-transition-old(root),::view-transition-new(root){animation:none!important}
 }
   </style>
 </head>
@@ -609,12 +614,22 @@ async function route(){const [path,qs]=(location.hash.slice(1)||"/").split("?"),
  if(authed.includes(name)&&needLogin())return;
  if(name=="edit"&&!auth.hasRole("seller")){location.hash="#/seller";return}
  const previousScroll=window.scrollY;
- navbar();$("#app").innerHTML=name==="browse"?skeletonGrid():'<div class="card empty" role="status"><p class="mute">Loading…</p></div>';
- try{$("#app").innerHTML=await (V[name]||(()=>"<p>Page not found.</p>"))(name=="login"?state:args,q)
-  if(window.matchMedia("(max-width:879px)").matches){const fd=$(".filters");if(fd)fd.open=false}}
- catch(x){$("#app").innerHTML=errBox(x.message)}
- if(keepScroll)window.scrollTo(0,previousScroll);else window.scrollTo(0,0);
- keepScroll=false}
+ navbar();
+ if(!$("#app").innerHTML.trim())$("#app").innerHTML=name==="browse"?skeletonGrid():'<div class="card empty" role="status"><p class="mute">Loading…</p></div>';
+ try{
+  const render=async()=>{
+   $("#app").innerHTML=await (V[name]||(()=>"<p>Page not found.</p>"))(name=="login"?state:args,q);
+   if(window.matchMedia("(max-width:879px)").matches){const fd=$(".filters");if(fd)fd.open=false}
+   if(keepScroll)window.scrollTo(0,previousScroll);else{$("#app").focus({preventScroll:true});window.scrollTo(0,0)}
+   keepScroll=false;
+  };
+  if(document.startViewTransition&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+   await document.startViewTransition(render).finished;
+  }else{
+   await render();
+  }
+ }catch(x){$("#app").innerHTML=errBox(x.message)}
+}
 
 /* ===== Boot: pull a fresh snapshot from the Postgres-backed API ===== */
 (async function boot(){
