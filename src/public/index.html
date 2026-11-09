@@ -338,7 +338,7 @@ function media(p, big=false){
  const title=String(p?.title??"");
  const initials=title.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"M";
  let h=0;for(const ch of String(p?.categoryName??""))h=(h*31+ch.charCodeAt(0))%360;
- const fallback=`<svg viewBox="0 0 400 300" aria-hidden="true" focusable="false"><rect width="400" height="300" fill="hsl(${h} 30% 86%)"/><text x="200" y="150" text-anchor="middle" dominant-baseline="middle" font-family="Fraunces, Georgia, serif" font-size="84" fill="hsl(${h} 28% 32%)">${esc(initials)}</text></svg>`;
+ const fallback=`<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><rect width="400" height="300" fill="hsl(${h} 30% 86%)"/><text x="200" y="150" text-anchor="middle" dominant-baseline="middle" font-family="Fraunces, Georgia, serif" font-size="84" fill="hsl(${h} 28% 32%)">${esc(initials)}</text></svg>`;
  const img=p?.imageUrl?`<img src="${esc(p.imageUrl)}" alt="${esc(title)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.style.display='none'">`:"";
  return `<div class="media${big?" big":""}">${fallback}${img}</div>`;
 }

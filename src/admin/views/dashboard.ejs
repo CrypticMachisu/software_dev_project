@@ -16,10 +16,12 @@
     <h2 class="h6 m-0">Revenue · last 14 days</h2>
     <span class="text-muted small">Confirmed and completed orders</span>
   </div>
-  <% const peak = Math.max(1, ...daily.map(d => d.revenue_minor)); %>
+  <% const peak = Math.max(1, ...daily.map(d => d.revenue_minor)); const trendTotal = daily.reduce((a, d) => a + d.revenue_minor, 0); %>
+  <% if (!trendTotal) { %><p class="text-muted mb-0">No confirmed revenue in the last 14 days.</p><% } else { %>
   <div class="chart" data-chart="revenue" role="img" aria-label="Revenue for the last 14 days">
     <% daily.forEach(d => { %><div class="chart-col"><div class="chart-bar" style="height:<%= Math.max(2, Math.round(d.revenue_minor / peak * 100)) %>%" title="<%= d.day %>: <%= money(d.revenue_minor) %>"></div><span class="chart-day"><%= d.day.slice(5) %></span></div><% }) %>
   </div>
+  <% } %>
 </div>
 
 <div class="card">
