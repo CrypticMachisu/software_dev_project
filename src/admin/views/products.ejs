@@ -32,7 +32,7 @@
       <td><%= p.title %></td>
       <td><%= p.seller %></td>
       <td><%= p.category %></td>
-      <td class="text-end"><%= Number(p.asking_price).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+      <td class="text-end"><%= money(Math.round(Number(p.asking_price) * 100)) %></td>
       <td class="text-end"><%= p.quantity_available %></td>
       <td><span class="badge text-bg-<%= badge[p.listing_status] || 'secondary' %>"><%= p.listing_status %></span></td>
       <td class="text-end"><a class="btn btn-outline-secondary btn-sm" href="/admin/products/<%= p.product_id %>/edit">Manage</a></td>

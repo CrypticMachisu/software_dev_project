@@ -97,6 +97,20 @@ a:hover{color:var(--acc-deep)}
 .login-brand::after{content:".";color:var(--acc)}
 .text-muted{color:var(--mute)!important}
 
+/* ---- dashboard ---- */
+.dash-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:16px}
+.dash-kpis .stat-value{font-size:1.5rem;overflow-wrap:anywhere}
+.chart-card{margin-bottom:16px}
+.chart{display:flex;align-items:flex-end;gap:6px;height:140px;padding-top:8px}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;min-width:0}
+.chart-bar{width:100%;max-width:30px;background:linear-gradient(180deg,var(--acc),var(--acc-soft));border-radius:5px 5px 2px 2px;min-height:2px}
+.chart-day{font-size:.62rem;color:var(--mute);font-variant-numeric:tabular-nums}
+.pipeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.pipeline>div{display:grid;gap:2px;padding:10px 12px;background:var(--paper);border-radius:9px}
+.pipeline-count{font-family:Fraunces,Georgia,serif;font-size:1.5rem;font-weight:560}
+.pipeline span:last-child{font-size:.78rem;color:var(--mute)}
+@media(max-width:900px){.dash-kpis,.pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 /* ---- responsive ---- */
 @media(max-width:768px){
   .admin-sidebar{width:100%;flex-direction:row;flex-wrap:wrap;align-items:center}
