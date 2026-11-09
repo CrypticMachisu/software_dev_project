@@ -228,6 +228,19 @@ td{text-align:left;padding:.62rem .5rem;border-bottom:1px solid var(--line-2);ve
  .account-links .pill{width:100%;justify-content:flex-start}
 }
 
+/* ---- cart + checkout ---- */
+.field-err{color:var(--bad);font-size:.82rem;margin:.25rem 0 0}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 2px var(--bad-soft)}
+.cart-line{display:grid;grid-template-columns:72px minmax(0,1fr) auto auto auto;gap:.7rem;align-items:center;margin-bottom:.4rem}
+.cart-line .media{width:72px;aspect-ratio:1}
+.cart-line-body{display:grid;gap:.1rem;min-width:0}
+.qty-input{width:72px}
+.order-steps{display:flex;list-style:none;padding:0;margin:0;gap:.3rem;flex-wrap:wrap;font-size:.76rem;color:var(--mute)}
+.order-steps li{padding:.15rem .5rem;border:1px solid var(--line);border-radius:999px}
+.order-steps li.done{background:var(--go-soft);border-color:var(--go);color:var(--go)}
+@media(max-width:760px){.cart-line{grid-template-columns:56px 1fr;grid-auto-rows:auto}.cart-line .price,.cart-line .qty-input,.cart-line button{grid-column:2}}
+@media(min-width:881px){.two>form>.card:last-child{position:sticky;top:4.6rem}}
+
 /* ---- product page ---- */
 .crumbs{display:flex;gap:.45rem;align-items:center;font-size:.85rem;margin-bottom:.8rem}
 .product-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:1.7rem;align-items:start}
@@ -282,6 +295,19 @@ let CURRENCY="USD";
 const money=(m,c=CURRENCY)=>new Intl.NumberFormat("en",{style:"currency",currency:c}).format(m/100);
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 function toast(t){const e=document.createElement("div");e.className="toast";e.setAttribute("role","status");e.setAttribute("aria-live","polite");e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),3500)}
+function setFieldError(input,message){
+ let p=input.parentElement.querySelector(".field-err");
+ if(!p){p=document.createElement("p");p.className="field-err";input.parentElement.append(p)}
+ const id=`err-${input.name}`;p.id=id;p.textContent=message;
+ input.setAttribute("aria-invalid","true");
+ input.setAttribute("aria-describedby",id);
+}
+function clearFieldError(input){
+ const p=input.parentElement.querySelector(".field-err");
+ if(p)p.remove();
+ input.removeAttribute("aria-invalid");
+ input.removeAttribute("aria-describedby");
+}
 
 /* ===== API client (talks to /api on the server: Postgres-backed) ===== */
 async function api(path,opts){const r=await fetch("/api"+path,{credentials:"same-origin",...opts});
@@ -402,25 +428,29 @@ V.product=async([id])=>{
  </div>
  <div class="mobile-buy"><span class="price">${money(p.priceMinor)}</span><button data-act="add" data-id="${p.id}" data-qty${disabled}>Add to cart</button></div>`;
 };
-V.cart=()=>{const g=cart.groupBySeller();if(!cart.items.length)return'<div class="card"><h1>Your cart is empty</h1><a href="#/">Find something to buy</a></div>';
- return `<h1>Shopping cart (${cart.count()} items)</h1><div class="two"><div>${Object.entries(g).map(([s,its])=>`<div class="group">Seller: ${esc(full(s)?.sellerName??"Seller")}</div>${its.map(i=>`<div class="card row" style="margin-bottom:.4rem">${media({title:i.titleSnapshot,imageUrl:i.imageUrl})}<span class="sp"><a href="#/product/${i.productId}">${esc(i.titleSnapshot)}</a><br><span class="mute">${money(i.unitPriceMinor)} each</span></span><input type="number" min="1" style="width:70px" value="${i.quantity}" data-act="qty" data-id="${i.productId}"><span class="price">${money(i.lineTotalMinor())}</span><button class="sm ghost" data-act="rm" data-id="${i.productId}" aria-label="Remove">✕</button></div>`).join("")}`).join("")}</div>
- <div class="card"><h2>Order summary</h2><div class="row"><span>Subtotal</span><span class="sp"></span><span>${money(cart.subtotalMinor())}</span></div><p class="mute">Items ship separately per seller. The final total is confirmed by the server.</p><a class="btn" style="display:block;text-align:center" href="#/checkout">Checkout</a></div></div>`};
+V.cart=()=>{const g=cart.groupBySeller();if(!cart.items.length)return'<div class="card empty"><h1>Your cart is empty</h1><p class="mute">Saved items live here until you check out.</p><a class="btn" href="#/">Find something to buy</a></div>';
+ return `<h1>Shopping cart <span class="mute">(${cart.count()} items)</span></h1><div class="two"><div>${Object.entries(g).map(([s,its])=>`<div class="group">Seller: ${esc(full(s)?.sellerName??"Seller")}</div>${its.map(i=>`<div class="card cart-line" data-line="${i.productId}">${media({title:i.titleSnapshot,imageUrl:i.imageUrl})}<div class="cart-line-body"><a href="#/product/${i.productId}">${esc(i.titleSnapshot)}</a><span class="mute">${money(i.unitPriceMinor)} each</span></div><input class="qty-input" type="number" min="1" value="${i.quantity}" data-act="qty" data-id="${i.productId}" aria-label="Quantity for ${esc(i.titleSnapshot)}"><span class="price" data-line-total>${money(i.lineTotalMinor())}</span><button class="sm ghost" data-act="rm" data-id="${i.productId}" aria-label="Remove ${esc(i.titleSnapshot)}">Remove</button></div>`).join("")}`).join("")}</div>
+ <div class="card"><h2>Order summary</h2><div class="row"><span>Subtotal</span><span class="sp"></span><span data-subtotal>${money(cart.subtotalMinor())}</span></div><p class="mute">Items ship separately per seller. The final total is confirmed by the server.</p><a class="btn" style="display:block;text-align:center" href="#/checkout">Checkout</a></div></div>`;
+};
 V.checkout=()=>{if(!cart.items.length)return'<p>Your cart is empty.</p>';const a=checkout.address,g=cart.groupBySeller();
- return `<h1>Checkout</h1><form data-form="checkout" class="two"><div class="card"><h2>Delivery address</h2><div class="two" style="grid-template-columns:1fr 1fr"><div><label>Full name</label><input name="name" required value="${esc(a.name||auth.user.name)}"></div><div><label>Phone</label><input name="phone" required value="${esc(a.phone)}"></div></div>
+ return `<h1>Checkout</h1><form data-form="checkout" class="two" novalidate><div class="card"><h2>Delivery address</h2><div class="two" style="grid-template-columns:1fr 1fr"><div><label>Full name</label><input name="name" required value="${esc(a.name||auth.user.name)}"></div><div><label>Phone</label><input name="phone" required value="${esc(a.phone)}"></div></div>
  <label>Street address</label><input name="street" required value="${esc(a.street)}"><div class="two" style="grid-template-columns:1fr 1fr"><div><label>City</label><input name="city" required value="${esc(a.city)}"></div><div><label>Postal code</label><input name="zip" required value="${esc(a.zip)}"></div></div>
  <h2 style="margin-top:1rem">Exchange method (per seller)</h2>${Object.keys(g).map(s=>`<div class="row"><strong class="sp">${esc(full(s)?.sellerName??"Seller")}</strong><select name="m${s}" style="width:auto">${db.methods.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("")}</select></div>`).join("")}</div>
  <div class="card"><h2>Order summary</h2><p>${cart.count()} items, ${Object.keys(g).length} seller(s)</p><div class="row"><strong>Total</strong><span class="sp"></span><strong>${money(cart.subtotalMinor())}</strong></div><div class="err" id="err"></div><button style="width:100%">Place order and pay</button><p class="mute">You will be redirected to the payment provider.</p></div></form>`};
 V.pay=async([id])=>{const {order:o}=await api("/order/"+encodeURIComponent(id));
  if(o.status!="pending")return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Order #${o.id} was already processed (${LABEL[o.status]??o.status}).</p><div class="row"><a class="btn" href="#/orders">View my orders</a></div></div>`;
- return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Simulated provider page for order #${o.id}.</p>${o.delivery?.street?`<p class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</p>`:""}<p class="price" style="font-size:1.4rem">${money(o.totalMinor)}</p><div class="row"><button data-act="pay" data-id="${o.id}" data-s="captured">Pay now</button><button class="ghost" data-act="pay" data-id="${o.id}" data-s="failed">Cancel payment</button></div><p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel order instead</button></p></div>`};
+ return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Simulated provider page for order #${o.id}.</p>${o.delivery?.street?`<p class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</p>`:""}<p class="price" style="font-size:1.4rem">${money(o.totalMinor,o.currency)}</p><div class="row"><button data-act="pay" data-id="${o.id}" data-s="captured">Pay now</button><button class="ghost" data-act="pay" data-id="${o.id}" data-s="failed">Cancel payment</button></div><p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel order instead</button></p></div>`};
 V.result=async([id])=>{const {order:o}=await api("/order/"+encodeURIComponent(id));
  if(o.status=="pending"){setTimeout(()=>route(),700);return'<div class="card" style="max-width:480px;margin:2rem auto"><h1>Confirming your payment…</h1><p class="mute">Waiting for the payment provider. This page updates by itself.</p></div>'}
  if(o.status=="cancelled")return`<div class="card" style="max-width:480px;margin:2rem auto"><h1>Payment did not go through</h1><p>Your order was not charged. Try again or change your cart.</p><div class="row"><a class="btn" href="#/pay/${o.id}">Retry payment</a><a href="#/cart">Back to cart</a></div></div>`;
  return `<div class="card" style="max-width:520px;margin:2rem auto"><h1 class="ok">Order placed</h1><p>Order #${o.id}: payment confirmed by the provider.</p>${o.sellerOrders.map(s=>`<div class="row"><span class="sp">${esc(s.sellerName)} · ${s.items.length} item(s)</span><span class="chip">${LABEL[s.fulfillment]??s.fulfillment}</span></div>`).join("")}<div class="row" style="margin-top:1rem"><a class="btn" href="#/orders">View my orders</a><a href="#/">Keep shopping</a></div></div>`};
-const stepper=s=>{const i=STEPS.indexOf(s.fulfillment);return i<0?`<span class="chip bad">${LABEL[s.fulfillment]??s.fulfillment}</span>`:`<div class="steps">${STEPS.map((x,k)=>`${k?'<span class="bar"></span>':""}<span class="dot ${k<=i?"on":""}" title="${LABEL[x]}"></span>`).join("")}<span class="chip" style="margin-left:.4rem">${LABEL[s.fulfillment]??s.fulfillment}</span></div>`};
+const stepper=s=>{const i=STEPS.indexOf(s.fulfillment);
+ if(i<0)return `<span class="chip bad">${LABEL[s.fulfillment]??s.fulfillment}</span>`;
+ return `<ol class="order-steps" aria-label="Order progress">${STEPS.map((x,k)=>`<li class="${k<=i?"done":""}"${k===i?' aria-current="step"':""}>${LABEL[x]}</li>`).join("")}</ol>`;
+};
 V.orders=async()=>{const os=(await api("/orders")).orders;
  if(!os.length)return'<div class="card"><h1>No orders yet</h1><a href="#/">Browse products</a></div>';
- return `<h1>My orders</h1>${os.map(o=>`<div class="card" style="margin-bottom:1rem"><div class="row"><strong>Order #${o.id} · ${new Date(o.orderedAt).toLocaleDateString()}</strong><span class="sp"></span><strong>${money(o.totalMinor)}</strong></div>${o.delivery?.street?`<div class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</div>`:""}${o.status=="pending"?`<div class="row" style="padding:.55rem 0;border-top:1px solid var(--line)"><span class="chip warn">Awaiting payment</span><span class="sp"></span><a class="btn ghost" href="#/pay/${o.id}">Pay now</a><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel</button></div>`:o.status=="cancelled"?'<span class="chip bad">Payment failed</span>':o.sellerOrders.map(s=>`<div class="row" style="padding:.5rem 0;border-top:1px solid var(--line)"><span style="min-width:140px">${esc(s.sellerName)} · ${s.items.length} item(s)${s.tracking?`<br><span class="mute">Tracking: ${esc(s.tracking)}</span>`:""}</span>${stepper(s)}<span class="sp"></span>
+ return `<h1>My orders</h1>${os.map(o=>`<div class="card" style="margin-bottom:1rem"><div class="row"><strong>Order #${o.id} · ${new Date(o.orderedAt).toLocaleDateString()}</strong><span class="sp"></span><strong>${money(o.totalMinor,o.currency)}</strong></div>${o.delivery?.street?`<div class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</div>`:""}${o.status=="pending"?`<div class="row" style="padding:.55rem 0;border-top:1px solid var(--line)"><span class="chip warn">Awaiting payment</span><span class="sp"></span><a class="btn ghost" href="#/pay/${o.id}">Pay now</a><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel</button></div>`:o.status=="cancelled"?'<span class="chip bad">Payment failed</span>':o.sellerOrders.map(s=>`<div class="row" style="padding:.5rem 0;border-top:1px solid var(--line)"><span style="min-width:140px">${esc(s.sellerName)} · ${s.items.length} item(s)${s.tracking?`<br><span class="mute">Tracking: ${esc(s.tracking)}</span>`:""}</span>${stepper(s)}<span class="sp"></span>
  ${s.fulfillment=="shipped"?`<button class="sm" data-act="receive" data-id="${s.id}">Confirm receipt</button>`:""}${s.fulfillment=="completed"?(s.reviewed?'<span class="chip ok">Reviewed</span>':`<button class="sm" data-act="review" data-id="${s.id}">Leave review</button>`)+(s.release!="not_eligible"?'<span class="chip warn">Refund requested</span>':`<button class="sm ghost" data-act="refund" data-id="${s.id}">Request refund</button>`):""}</div>`).join("")}</div>`).join("")}`};
 V.seller=async()=>{const u=auth.user;if(!u)return "<p>Sign in first.</p>";
  if(!auth.hasRole("seller"))return `<div class="card"><h1>Become a seller</h1><p>List items in a few clicks; orders arrive here as soon as buyers check out.</p><button data-act="beseller">Start selling</button></div>`;
@@ -435,7 +465,7 @@ V.seller=async()=>{const u=auth.user;if(!u)return "<p>Sign in first.</p>";
  <div class="card" style="margin-bottom:1rem"><div class="row"><h3 class="sp">Completed sales · last 14 days</h3><span class="mute">${st.completedOrders} order(s)</span></div><div class="bars">${st.daily.map(d=>`<div class="b" style="height:${Math.max(3,Math.round(d.revenueMinor/maxDay*90))}%" title="${d.day}: ${money(d.revenueMinor)}"></div>`).join("")}</div><div class="row mute" style="justify-content:space-between;margin-top:.3rem"><span>${st.daily[0]?.day??""}</span><span>${st.daily[st.daily.length-1]?.day??""}</span></div>
  ${st.top.length?`<h3 style="margin-top:1rem">Top listings · 30 days</h3>${st.top.map(t=>`<div class="row" style="border-top:1px solid var(--line-2);padding:.35rem 0"><span class="sp">${esc(t.title)}</span><span class="mute">${t.units} sold</span><span class="price">${money(t.revenueMinor)}</span></div>`).join("")}`:'<p class="mute">No completed sales yet.</p>'}</div>
  <h2>Incoming orders</h2><div class="card" style="overflow-x:auto;margin-bottom:1rem"><table><tr><th>Seller order</th><th>Buyer</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr>
- ${sos.map(s=>`<tr><td>#${s.id}</td><td>${esc(s.buyerName)}${s.delivery?.street?`<br><span class="mute">${esc(s.delivery.street)}, ${esc(s.delivery.city)}</span>`:""}</td><td>${s.items.map(i=>`${i.qty}× ${esc(i.title)}`).join(", ")}</td><td>${money(s.totalMinor)}</td><td><span class="chip ${s.fulfillment=="cancelled"?"bad":""}">${LABEL[s.fulfillment]??s.fulfillment}</span></td><td>${btnFor(s)}</td></tr>`).join("")||'<tr><td colspan="6" class="mute">No orders yet.</td></tr>'}</table></div>
+ ${sos.map(s=>`<tr><td>#${s.id}</td><td>${esc(s.buyerName)}${s.delivery?.street?`<br><span class="mute">${esc(s.delivery.street)}, ${esc(s.delivery.city)}</span>`:""}</td><td>${s.items.map(i=>`${i.qty}× ${esc(i.title)}`).join(", ")}</td><td>${money(s.totalMinor,s.currency)}</td><td><span class="chip ${s.fulfillment=="cancelled"?"bad":""}">${LABEL[s.fulfillment]??s.fulfillment}</span></td><td>${btnFor(s)}</td></tr>`).join("")||'<tr><td colspan="6" class="mute">No orders yet.</td></tr>'}</table></div>
  <div class="row"><h2 class="sp">My listings</h2></div><div class="card" style="overflow-x:auto"><table><tr><th></th><th>Title</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>
  ${mine.map(p=>`<tr><td>${media(p)}</td><td>${esc(p.title)}</td><td>${money(p.priceMinor)}</td><td>${p.qty}</td><td><span class="chip ${p.status=="active"?"ok":""}">${esc(p.status)}</span></td><td><a href="#/seller/edit/${p.id}">Edit</a></td></tr>`).join("")||'<tr><td colspan="6" class="mute">No listings yet — create your first one.</td></tr>'}</table></div>`};
 V.edit=async([id])=>{const isNew=id=="new";
@@ -460,7 +490,18 @@ const A={
   route()},
  add(e){const q=e.hasAttribute("data-qty")?+$("#qty").value:1;cart.addItem(+e.dataset.id,q);navbar();if(cart.items.some(i=>i.productId==+e.dataset.id))toast("Added to cart")},
  buy(e){cart.addItem(+e.dataset.id,+$("#qty").value||1);if(cart.items.length)location.hash="#/cart"},
- qty(e){cart.updateQuantity(+e.dataset.id,e.value);route()},
+ qty(e){
+  const id=+e.dataset.id;
+  cart.updateQuantity(id,e.value);
+  const it=cart.items.find(i=>i.productId==id);
+  if(!it)return;
+  e.value=it.quantity;
+  const line=document.querySelector(`[data-line="${id}"]`);
+  if(line){const total=line.querySelector("[data-line-total]");if(total)total.textContent=money(it.lineTotalMinor())}
+  const subtotal=document.querySelector("[data-subtotal]");
+  if(subtotal)subtotal.textContent=money(cart.subtotalMinor());
+  navbar();
+ },
  rm(e){cart.removeItem(+e.dataset.id);route()},
  cancelOrder(e){if(!confirm("Cancel this unpaid order?"))return;call("POST",`/order/${e.dataset.id}/cancel`).then(()=>{toast("Order cancelled");route()}).catch(x=>toast(x.message))},
  pay(e){const id=+e.dataset.id,st=e.dataset.s;if(st=="captured")cart.clear();navbar();location.hash="#/result/"+id;
@@ -520,11 +561,17 @@ document.addEventListener("keydown",ev=>{const id=ev.target.id;if(ev.key!="Enter
   if(location.hash!==next)location.hash=next;else route();
  }
  if(id=="min"||id=="max")A.price()});
+document.addEventListener("input",ev=>{if(ev.target.matches('[aria-invalid="true"]'))clearFieldError(ev.target)});
 document.addEventListener("submit",ev=>{const f=ev.target,k=f.dataset.form;if(!k)return;ev.preventDefault();
  const d=Object.fromEntries(new FormData(f));const errs=f.querySelectorAll(".err"),err=errs[errs.length-1]||document.getElementById("err");
  (async()=>{
   if(k=="auth"){state.mode=="reg"?await auth.register(d.name,d.email,d.pw):await auth.login(d.email,d.pw);navbar();location.hash=decodeURIComponent(f.dataset.next)}
-  else if(k=="checkout"){checkout.address={name:d.name,phone:d.phone,street:d.street,city:d.city,zip:d.zip};store.set("mkt_addr",checkout.address);
+  else if(k=="checkout"){
+   const required=[...f.querySelectorAll("[required]")];
+   const missing=required.find(el=>!el.value.trim());
+   if(missing){setFieldError(missing,"This field is required.");missing.focus();return}
+   required.forEach(clearFieldError);
+   checkout.address={name:d.name,phone:d.phone,street:d.street,city:d.city,zip:d.zip};store.set("mkt_addr",checkout.address);
    const m={};Object.keys(cart.groupBySeller()).forEach(s=>m[s]=+d["m"+s]);
    const r=await call("POST","/checkout",{items:cart.items.map(i=>({productId:i.productId,quantity:i.quantity})),address:checkout.address,methods:m});
    location.hash="#/pay/"+r.order}

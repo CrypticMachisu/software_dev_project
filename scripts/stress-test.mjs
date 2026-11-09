@@ -102,6 +102,9 @@ async function main() {
     ok("Browse cards expose a product link and add control", root.body.includes("product-card") && root.body.includes('data-act="add"'));
     ok("Product page has a buy box and trust row", root.body.includes("buybox") && root.body.includes("Buyer protection"));
     ok("Product page has a mobile buy bar", root.body.includes("mobile-buy"));
+    ok("Cart updates totals in place", root.body.includes("data-line-total") && root.body.includes("data-subtotal"));
+    ok("Order progress uses text labels", root.body.includes("order-steps"));
+    ok("Checkout links errors to fields", root.body.includes("aria-describedby") || root.body.includes("field-err"));
   }
 
   section("2. Catalogue");

@@ -724,10 +724,11 @@ api.get("/seller/orders", asyncWrap(async (req, res) => {
     seller_order_id: string; order_id: string; buyer_name: string;
     fulfillment_status: string; release_status: string; tracking_number: string | null;
     delivery_name: string | null; delivery_phone: string | null; delivery_street: string | null;
-    delivery_city: string | null; delivery_zip: string | null;
+    delivery_city: string | null; delivery_zip: string | null; currency: string;
   }>(        `SELECT so.seller_order_id, so.order_id, u.name AS buyer_name,
                 so.fulfillment_status, so.release_status, so.tracking_number,
-                mo.delivery_name, mo.delivery_phone, mo.delivery_street, mo.delivery_city, mo.delivery_zip
+                mo.delivery_name, mo.delivery_phone, mo.delivery_street, mo.delivery_city, mo.delivery_zip,
+                mo.currency
      FROM seller_order so
      JOIN market_order mo USING(order_id)
      JOIN app_user u ON u.user_id = mo.buyer_id
@@ -756,6 +757,7 @@ api.get("/seller/orders", asyncWrap(async (req, res) => {
           city: r.delivery_city ?? "",
           zip: r.delivery_zip ?? "",
         },
+        currency: r.currency,
         totalMinor: its.reduce((a, i) => a + Number(i.line_total_minor), 0),
         items: its.map(i => ({ title: i.title, qty: i.quantity, unitMinor: Number(i.unit_price_minor) })),
       };
