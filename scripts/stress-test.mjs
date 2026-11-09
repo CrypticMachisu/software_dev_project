@@ -346,6 +346,8 @@ async function main() {
     ok("Super admin login redirects into panel", login.res.status === 302, `status ${login.res.status}`);
     const dash = await admin.text("/admin");
     ok("Dashboard renders", dash.status === 200 && dash.body.includes("Dashboard"));
+    ok("Dashboard shows revenue chart", dash.body.includes('data-chart="revenue"'));
+    ok("Dashboard shows an order pipeline", dash.body.includes("Order pipeline"));
     ok("Admin uses inline SVG icons", dash.body.includes('<symbol id="icon-dashboard"') && !dash.body.includes("ph ph-"));
     const csp = dash.headers.get("content-security-policy") ?? "";
     ok("Admin CSP allows product images from https", /img-src[^;]*https:/.test(csp), csp);

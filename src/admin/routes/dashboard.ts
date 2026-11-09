@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { query } from "../db-helpers.js";
+import { env } from "../../env.js";
 
 export const dashboardRouter = Router();
 
@@ -11,8 +12,47 @@ dashboardRouter.get("/", async (_req, res, next) => {
           (SELECT count(*) FROM app_user) AS users,
           (SELECT count(*) FROM user_role ur JOIN app_role r ON r.role_id = ur.role_id
             WHERE r.role_name = 'seller' AND ur.approval_status = 'approved') AS sellers,
-          (SELECT count(*) FROM market_order) AS orders,
-          (SELECT coalesce(sum(amount_minor),0) FROM payment WHERE status = 'captured') AS revenue_minor`,
+          (SELECT count(*) FROM market_order) AS orders`,
+      )
+    ).rows[0];
+
+    const revenueByCurrency = (
+      await query<{ currency: string; revenue_minor: string }>(
+        `SELECT currency, coalesce(sum(total_amount_minor),0)::text AS revenue_minor
+         FROM market_order WHERE order_status IN ('confirmed','completed')
+         GROUP BY currency ORDER BY currency`,
+      )
+    ).rows;
+
+    const trendRows = (
+      await query<{ day: string; revenue_minor: string }>(
+        `SELECT to_char(date_trunc('day', ordered_at), 'YYYY-MM-DD') AS day,
+                coalesce(sum(total_amount_minor),0)::text AS revenue_minor
+         FROM market_order
+         WHERE currency = $1 AND order_status IN ('confirmed','completed')
+           AND ordered_at >= current_date - interval '13 days'
+         GROUP BY 1 ORDER BY 1`,
+        [env.currency],
+      )
+    ).rows;
+
+    const byDay = new Map(trendRows.map((r) => [r.day, Number(r.revenue_minor)]));
+    const daily: { day: string; revenue_minor: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      daily.push({ day: key, revenue_minor: byDay.get(key) ?? 0 });
+    }
+
+    const pipeline = (
+      await query(
+        `SELECT
+          count(*) FILTER (WHERE fulfillment_status = 'pending')::int AS pending,
+          count(*) FILTER (WHERE fulfillment_status IN ('confirmed','processing'))::int AS processing,
+          count(*) FILTER (WHERE fulfillment_status = 'shipped')::int AS shipped,
+          count(*) FILTER (WHERE fulfillment_status = 'completed')::int AS completed
+         FROM seller_order`,
       )
     ).rows[0];
 
@@ -47,7 +87,17 @@ dashboardRouter.get("/", async (_req, res, next) => {
       )
     ).rows;
 
-    res.render("dashboard", { title: "Dashboard", active: "dashboard", stats, pending, recent, lowStock });
+    res.render("dashboard", {
+      title: "Dashboard",
+      active: "dashboard",
+      stats,
+      revenueByCurrency,
+      daily,
+      pipeline,
+      pending,
+      recent,
+      lowStock,
+    });
   } catch (e) {
     next(e);
   }
