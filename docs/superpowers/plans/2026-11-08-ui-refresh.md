@@ -52,7 +52,7 @@
 - Modify: `src/public/index.html` (`:root` block)
 - Modify: `src/admin/public/css/admin.css` (`:root` block)
 
-- [ ] **Step 1: Write the failing contrast script**
+- [x] **Step 1: Write the failing contrast script**
 
 ```js
 // scripts/check-contrast.mjs
@@ -119,12 +119,12 @@ if (failed) {
 console.log("All contrast checks pass");
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `node scripts/check-contrast.mjs`
 Expected: FAIL for `storefront mute`, `warn`, `go` and the corresponding admin literals; exit code 1.
 
-- [ ] **Step 3: Change the storefront tokens**
+- [x] **Step 3: Change the storefront tokens**
 
 In `src/public/index.html`, replace the light `:root` block values:
 
@@ -143,7 +143,7 @@ In `src/public/index.html`, replace the light `:root` block values:
 
 Keep the dark-mode block unchanged.
 
-- [ ] **Step 4: Change the admin tokens**
+- [x] **Step 4: Change the admin tokens**
 
 In `src/admin/public/css/admin.css`, replace the `:root` block:
 
@@ -167,7 +167,7 @@ Update the warning badge border to the new hue:
 .badge.text-bg-warning{background:var(--warn-soft)!important;color:var(--warn)!important;border:1px solid rgba(122,82,23,.25)}
 ```
 
-- [ ] **Step 5: Add spacing/type tokens and make layout mobile-first**
+- [x] **Step 5: Add spacing/type tokens and make layout mobile-first**
 
 Add to the storefront `:root`:
 
@@ -202,7 +202,7 @@ nav .search{order:9;width:100%;max-width:none}
 @media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr)}}
 ```
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `node scripts/check-contrast.mjs`
 Expected: all `PASS`, exit 0.
@@ -220,7 +220,7 @@ git commit -m "fix: raise UI contrast to WCAG AA"
 - Modify: `src/public/index.html`
 - Modify: `scripts/stress-test.mjs` (section 1)
 
-- [ ] **Step 1: Add failing static assertions**
+- [x] **Step 1: Add failing static assertions**
 
 In `scripts/stress-test.mjs` section 1, after the existing storefront checks:
 
@@ -231,12 +231,12 @@ ok("Review dialog is announced", root.body.includes('setAttribute("role","dialog
 ok("Toasts are live regions", root.body.includes('setAttribute("role","status")') && root.body.includes('setAttribute("aria-live","polite")'));
 ```
 
-- [ ] **Step 2: Run the harness to verify it fails**
+- [x] **Step 2: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL for the four new assertions.
 
-- [ ] **Step 3: Add the skip link and touch-target CSS**
+- [x] **Step 3: Add the skip link and touch-target CSS**
 
 Immediately after `<body>`:
 
@@ -261,7 +261,7 @@ nav .pill,aside .fcat,.btn,button,summary{min-height:44px}
 aside .fcat{padding:.55rem .78rem}
 ```
 
-- [ ] **Step 4: Add the browse `h1`**
+- [x] **Step 4: Add the browse `h1`**
 
 At the start of the `V.browse` return string, before `<div class="layout">`, add:
 
@@ -271,7 +271,7 @@ At the start of the `V.browse` return string, before `<div class="layout">`, add
 
 This is expanded in Task 8; the heading is the accessibility requirement.
 
-- [ ] **Step 5: Replace the toast and review modal**
+- [x] **Step 5: Replace the toast and review modal**
 
 Replace `function toast`:
 
@@ -329,7 +329,7 @@ Add modal CSS:
   background:transparent;border:1px solid var(--line);color:var(--ink);font-size:1.3rem}
 ```
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `node scripts/stress-test.mjs`
 Expected: 98 old checks plus 4 new checks pass.
@@ -353,7 +353,7 @@ git commit -m "feat: add storefront skip link and accessible dialog"
 - Modify: `src/admin/public/css/admin.css`
 - Modify: `scripts/stress-test.mjs` (section 9)
 
-- [ ] **Step 1: Add a failing assertion**
+- [x] **Step 1: Add a failing assertion**
 
 In section 9 after `dash` is fetched:
 
@@ -361,12 +361,12 @@ In section 9 after `dash` is fetched:
 ok("Admin uses inline SVG icons", dash.body.includes('<symbol id="icon-dashboard"') && !dash.body.includes("ph ph-"));
 ```
 
-- [ ] **Step 2: Run the harness to verify it fails**
+- [x] **Step 2: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL "Admin uses inline SVG icons".
 
-- [ ] **Step 3: Create the sprite**
+- [x] **Step 3: Create the sprite**
 
 `src/admin/views/partials/icons.ejs`:
 
@@ -388,7 +388,7 @@ Expected: FAIL "Admin uses inline SVG icons".
 </svg>
 ```
 
-- [ ] **Step 4: Wire the header**
+- [x] **Step 4: Wire the header**
 
 In `src/admin/views/partials/header.ejs`, after `<body>`:
 
@@ -426,7 +426,7 @@ Add the logout icon to the header button:
 <button class="btn btn-outline-secondary btn-sm"><svg class="icon" aria-hidden="true"><use href="#icon-logout"></use></svg> Log out</button>
 ```
 
-- [ ] **Step 5: Replace remaining Phosphor icons**
+- [x] **Step 5: Replace remaining Phosphor icons**
 
 In `products.ejs`, replace the two `<i class="ph …"></i>` elements with:
 
@@ -453,7 +453,7 @@ In `exchange.ejs`, both add buttons:
 <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
 ```
 
-- [ ] **Step 6: Add CSS and remove the CDN import**
+- [x] **Step 6: Add CSS and remove the CDN import**
 
 Delete this line from `admin.css`:
 
@@ -472,7 +472,7 @@ Add:
   border-radius:999px;padding:.05rem .4rem}
 ```
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
 Run: `npm run build && node scripts/stress-test.mjs`
 Expected: the new icon assertion passes; all admin pages still 200.
@@ -491,7 +491,7 @@ git commit -m "feat: replace admin icon font with inline SVG"
 - Modify: `src/env.ts`
 - Modify: `scripts/stress-test.mjs` (section 2)
 
-- [ ] **Step 1: Add a failing currency assertion**
+- [x] **Step 1: Add a failing currency assertion**
 
 In section 2 after the bootstrap request:
 
@@ -502,7 +502,7 @@ ok("Bootstrap exposes a configured three-letter currency", /^[A-Z]{3}$/.test(app
 
 Declare `let appCurrency = "USD";` immediately after `const anon = new Jar();` in `main()`.
 
-- [ ] **Step 2: Write the migration**
+- [x] **Step 2: Write the migration**
 
 `SQL/005_product_images.sql`:
 
@@ -517,7 +517,7 @@ ALTER TABLE product
 COMMIT;
 ```
 
-- [ ] **Step 3: Add currency parsing**
+- [x] **Step 3: Add currency parsing**
 
 In `src/env.ts`, replace the exported object with:
 
@@ -537,7 +537,7 @@ export const env = {
 
 Keep the existing `DATABASE_URL` check below it.
 
-- [ ] **Step 4: Apply and verify the migration**
+- [x] **Step 4: Apply and verify the migration**
 
 Run:
 
@@ -556,7 +556,7 @@ node --env-file=.env -e "import('./dist/src/db.js').then(async ({pool})=>{const 
 
 Expected: one row, `image_url`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add SQL/005_product_images.sql src/env.ts scripts/stress-test.mjs
@@ -573,7 +573,7 @@ The currency assertion still fails until Task 5 changes the API; that is expecte
 - Modify: `src/api/index.ts`
 - Modify: `scripts/stress-test.mjs` (sections 2, 4, 5)
 
-- [ ] **Step 1: Add failing API assertions**
+- [x] **Step 1: Add failing API assertions**
 
 In section 2:
 
@@ -605,7 +605,7 @@ ok("Order uses the configured app currency", det.data.order.currency === appCurr
 
 `appCurrency` is declared in Task 4 and captured from the bootstrap response.
 
-- [ ] **Step 2: Extend the harness listing helper**
+- [x] **Step 2: Extend the harness listing helper**
 
 Change `createListing` in `scripts/stress-test.mjs` to accept an image URL:
 
@@ -617,12 +617,12 @@ async function createListing(jar, { title, priceMinor, qty, categoryId, imageUrl
 }
 ```
 
-- [ ] **Step 3: Run the harness to verify it fails**
+- [x] **Step 3: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL for image/currency assertions.
 
-- [ ] **Step 4: Wire currency through the API**
+- [x] **Step 4: Wire currency through the API**
 
 At the top of `src/api/index.ts`:
 
@@ -660,7 +660,7 @@ const orderRes = await client.query<{ order_id: string; ordered_at: Date }>(
 );
 ```
 
-- [ ] **Step 5: Wire the configured currency into the storefront**
+- [x] **Step 5: Wire the configured currency into the storefront**
 
 Before `money(...)` in the utilities, add:
 
@@ -686,7 +686,7 @@ Change the seller edit price label from `Price (USD)` to:
 <label>Price (${CURRENCY})</label>
 ```
 
-- [ ] **Step 6: Add `imageUrl` to product shaping and reads**
+- [x] **Step 6: Add `imageUrl` to product shaping and reads**
 
 In `rowToProduct`:
 
@@ -700,7 +700,7 @@ Add `p.image_url` to the SELECT list in all four product reads: `loadCatalogue`,
 p.title, p.description, p.image_url, p.asking_price, p.quantity_available, p.listing_status
 ```
 
-- [ ] **Step 7: Validate and persist the image URL**
+- [x] **Step 7: Validate and persist the image URL**
 
 In `readListing`:
 
@@ -733,7 +733,7 @@ Change the UPDATE:
 [id, v.categoryId, v.title, v.description, v.asking_price, v.quantity_available, v.listing_status, v.image_url]
 ```
 
-- [ ] **Step 8: Rebuild, restart, verify and commit**
+- [x] **Step 8: Rebuild, restart, verify and commit**
 
 Restart the server (Ctrl+C, then `npm run start`), then:
 
@@ -761,7 +761,7 @@ git commit -m "feat: expose product images and app currency through the API"
 - Modify: `src/public/index.html` (`V.edit`, listing submit)
 - Modify: `scripts/stress-test.mjs` (section 9)
 
-- [ ] **Step 1: Add failing form assertions**
+- [x] **Step 1: Add failing form assertions**
 
 In section 9, after the dashboard fetch:
 
@@ -770,12 +770,12 @@ const productForm = await admin.text("/admin/products/new");
 ok("Admin product form has an image URL field", productForm.status === 200 && productForm.body.includes('name="image_url"'));
 ```
 
-- [ ] **Step 2: Run the harness to verify it fails**
+- [x] **Step 2: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL "Admin product form has an image URL field".
 
-- [ ] **Step 3: Extend the admin form model**
+- [x] **Step 3: Extend the admin form model**
 
 In `src/admin/routes/products.ts`:
 
@@ -806,7 +806,7 @@ if (f.image_url.length > 500) problems.push("Image URL must be 500 characters or
 if (f.image_url && !/^https?:\/\//i.test(f.image_url)) problems.push("Image URL must start with http:// or https://.");
 ```
 
-- [ ] **Step 4: Persist the admin field**
+- [x] **Step 4: Persist the admin field**
 
 In `loadProduct`, add `p.image_url` to the SELECT and the row type as `image_url: string | null`.
 
@@ -830,7 +830,7 @@ In the POST edit UPDATE:
 [id, form.category_id, form.title, form.description || null, form.asking_price, form.quantity_available, form.image_url || null]
 ```
 
-- [ ] **Step 5: Add the admin field and preview**
+- [x] **Step 5: Add the admin field and preview**
 
 In `product_form.ejs`, after the description field:
 
@@ -870,7 +870,7 @@ document.querySelectorAll("[data-image-url]").forEach(function (input) {
 });
 ```
 
-- [ ] **Step 6: Add the seller field**
+- [x] **Step 6: Add the seller field**
 
 In `V.edit`, add `imageUrl: ""` to the default product and use `p=l` so the API value is present.
 
@@ -887,7 +887,7 @@ In the listing submit body, add:
 imageUrl:d.imageUrl.trim(),
 ```
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
 Run: `npm run build`, restart the server, then `node scripts/stress-test.mjs`.
 Expected: admin form assertion passes; seller listing image roundtrip still passes.
@@ -905,7 +905,7 @@ git commit -m "feat: let sellers and admins set product images"
 - Modify: `src/public/index.html`
 - Modify: `scripts/stress-test.mjs` (section 1)
 
-- [ ] **Step 1: Add failing static assertions**
+- [x] **Step 1: Add failing static assertions**
 
 In section 1:
 
@@ -914,12 +914,12 @@ ok("Storefront no longer uses emoji product media", !root.body.includes("📷") 
 ok("Storefront renders image fallbacks with alt text", root.body.includes("imageUrl") && root.body.includes('referrerpolicy="no-referrer"'));
 ```
 
-- [ ] **Step 2: Run the harness to verify it fails**
+- [x] **Step 2: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL for both media assertions.
 
-- [ ] **Step 3: Replace the emoji map with a media helper**
+- [x] **Step 3: Replace the emoji map with a media helper**
 
 Replace `PIC_BY_CATEGORY`, `PIC_DEFAULT` and `pic` with:
 
@@ -936,7 +936,7 @@ function media(p, big=false){
 
 Change `CartItem` to store `imageUrl:p.imageUrl??null` instead of `pic:pic(p)`.
 
-- [ ] **Step 4: Use the helper in every product surface**
+- [x] **Step 4: Use the helper in every product surface**
 
 - `V.browse` card media (replaced again in Task 8) uses `${media(p)}`.
 - `V.product` detail uses `${media(p,true)}`.
@@ -944,7 +944,7 @@ Change `CartItem` to store `imageUrl:p.imageUrl??null` instead of `pic:pic(p)`.
 - `V.seller` listings table uses `media(p)`.
 - `V.edit` does not render media.
 
-- [ ] **Step 5: Add media CSS**
+- [x] **Step 5: Add media CSS**
 
 ```css
 .media{position:relative;aspect-ratio:4/3;overflow:hidden;border-radius:calc(var(--r-lg) - 6px);background:var(--chip)}
@@ -957,7 +957,7 @@ Change `CartItem` to store `imageUrl:p.imageUrl??null` instead of `pic:pic(p)`.
 
 Remove the `.pic` rules.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `node scripts/stress-test.mjs`
 Expected: media assertions pass; product pages still render.
@@ -975,7 +975,7 @@ git commit -m "feat: replace emoji product media with image fallbacks"
 - Modify: `src/public/index.html`
 - Modify: `scripts/stress-test.mjs` (section 1)
 
-- [ ] **Step 1: Add failing assertions**
+- [x] **Step 1: Add failing assertions**
 
 In section 1:
 
@@ -984,12 +984,12 @@ ok("Browse has a mobile filter drawer", root.body.includes('class="filters"') &&
 ok("Browse cards expose a product link and add control", root.body.includes("product-card") && root.body.includes('data-act="add"'));
 ```
 
-- [ ] **Step 2: Run the harness to verify it fails**
+- [x] **Step 2: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL for the two browse assertions.
 
-- [ ] **Step 3: Replace `V.browse`**
+- [x] **Step 3: Replace `V.browse`**
 
 ```js
 let browsePainted=false;
@@ -1023,7 +1023,7 @@ V.browse=()=>{
 };
 ```
 
-- [ ] **Step 4: Close the drawer after mobile filtering**
+- [x] **Step 4: Close the drawer after mobile filtering**
 
 In `route()`, after writing the view, add:
 
@@ -1031,7 +1031,7 @@ In `route()`, after writing the view, add:
 if(window.matchMedia("(max-width:879px)").matches){const fd=$(".filters");if(fd)fd.open=false}
 ```
 
-- [ ] **Step 5: Keep scroll position for filter changes**
+- [x] **Step 5: Keep scroll position for filter changes**
 
 Add `let keepScroll=false;` near `const catalog`.
 
@@ -1050,7 +1050,7 @@ if(keepScroll)window.scrollTo(0,previousScroll);else window.scrollTo(0,0);
 keepScroll=false;
 ```
 
-- [ ] **Step 6: Reflect search in the URL hash**
+- [x] **Step 6: Reflect search in the URL hash**
 
 Replace the `#q` branch in the keydown listener:
 
@@ -1076,7 +1076,7 @@ if(location.hash.includes("?")){location.hash="#/";return}
 route();
 ```
 
-- [ ] **Step 7: Add browse CSS**
+- [x] **Step 7: Add browse CSS**
 
 ```css
 .browse-head{display:flex;align-items:end;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem}
@@ -1097,7 +1097,7 @@ route();
 }
 ```
 
-- [ ] **Step 8: Add the compact mobile account menu**
+- [x] **Step 8: Add the compact mobile account menu**
 
 Replace the signed-in segment of `navbar()` with:
 
@@ -1121,7 +1121,7 @@ Add CSS:
 }
 ```
 
-- [ ] **Step 9: Verify and commit**
+- [x] **Step 9: Verify and commit**
 
 Run: `node scripts/stress-test.mjs`
 Expected: browse assertions pass; no JS boot errors on `/`.
@@ -1139,7 +1139,7 @@ git commit -m "feat: rebuild browse composition with mobile filters"
 - Modify: `src/public/index.html`
 - Modify: `scripts/stress-test.mjs` (section 1)
 
-- [ ] **Step 1: Add failing assertions**
+- [x] **Step 1: Add failing assertions**
 
 In section 1:
 
@@ -1148,12 +1148,12 @@ ok("Product page has a buy box and trust row", root.body.includes("buybox") && r
 ok("Product page has a mobile buy bar", root.body.includes("mobile-buy"));
 ```
 
-- [ ] **Step 2: Run the harness to verify it fails**
+- [x] **Step 2: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL for both.
 
-- [ ] **Step 3: Replace `V.product`**
+- [x] **Step 3: Replace `V.product`**
 
 ```js
 V.product=async([id])=>{
@@ -1184,7 +1184,7 @@ V.product=async([id])=>{
 };
 ```
 
-- [ ] **Step 4: Add product CSS**
+- [x] **Step 4: Add product CSS**
 
 ```css
 .crumbs{display:flex;gap:.45rem;align-items:center;font-size:.85rem;margin-bottom:.8rem}
@@ -1209,7 +1209,7 @@ V.product=async([id])=>{
 }
 ```
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: `node scripts/stress-test.mjs`
 Expected: new product assertions pass; add-to-cart still works.
@@ -1227,7 +1227,7 @@ git commit -m "feat: rebuild product page around the buy box"
 - Modify: `src/public/index.html`
 - Modify: `scripts/stress-test.mjs` (section 1)
 
-- [ ] **Step 1: Add failing assertions**
+- [x] **Step 1: Add failing assertions**
 
 In section 1:
 
@@ -1237,12 +1237,12 @@ ok("Order progress uses text labels", root.body.includes("order-steps"));
 ok("Checkout links errors to fields", root.body.includes("aria-describedby") || root.body.includes("field-err"));
 ```
 
-- [ ] **Step 2: Run the harness to verify it fails**
+- [x] **Step 2: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL for the three.
 
-- [ ] **Step 3: Replace `V.cart`**
+- [x] **Step 3: Replace `V.cart`**
 
 ```js
 V.cart=()=>{const g=cart.groupBySeller();if(!cart.items.length)return'<div class="card empty"><h1>Your cart is empty</h1><p class="mute">Saved items live here until you check out.</p><a class="btn" href="#/">Find something to buy</a></div>';
@@ -1251,7 +1251,7 @@ V.cart=()=>{const g=cart.groupBySeller();if(!cart.items.length)return'<div class
 };
 ```
 
-- [ ] **Step 4: Update quantity in place**
+- [x] **Step 4: Update quantity in place**
 
 Replace `A.qty`:
 
@@ -1270,7 +1270,7 @@ qty(e){
 }
 ```
 
-- [ ] **Step 5: Add field-error helpers**
+- [x] **Step 5: Add field-error helpers**
 
 Near the utilities:
 
@@ -1296,7 +1296,7 @@ Add a global input listener:
 document.addEventListener("input",ev=>{if(ev.target.matches('[aria-invalid="true"]'))clearFieldError(ev.target)});
 ```
 
-- [ ] **Step 6: Make checkout validate fields**
+- [x] **Step 6: Make checkout validate fields**
 
 Add `novalidate` to the checkout form:
 
@@ -1322,7 +1322,7 @@ Add CSS:
 input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 2px var(--bad-soft)}
 ```
 
-- [ ] **Step 7: Replace the order stepper**
+- [x] **Step 7: Replace the order stepper**
 
 ```js
 const stepper=s=>{const i=STEPS.indexOf(s.fulfillment);
@@ -1344,7 +1344,7 @@ Add CSS:
 @media(max-width:760px){.cart-line{grid-template-columns:56px 1fr;grid-auto-rows:auto}.cart-line .price,.cart-line .qty-input,.cart-line button{grid-column:2}}
 ```
 
-- [ ] **Step 8: Show the stored order currency**
+- [x] **Step 8: Show the stored order currency**
 
 In `V.orders`, change the order total to `money(o.totalMinor,o.currency)`.
 In `V.pay`, change the amount to `money(o.totalMinor,o.currency)`.
@@ -1357,7 +1357,7 @@ Add the sticky checkout summary:
 @media(min-width:881px){.two>form>.card:last-child{position:sticky;top:4.6rem}}
 ```
 
-- [ ] **Step 9: Verify and commit**
+- [x] **Step 9: Verify and commit**
 
 Run: `node scripts/stress-test.mjs`
 Expected: cart/checkout/order assertions pass.
@@ -1374,13 +1374,13 @@ git commit -m "feat: make cart and checkout updates accessible"
 **Files:**
 - Modify: `src/public/index.html`
 
-- [ ] **Step 1: Add the skeleton**
+- [x] **Step 1: Add the skeleton**
 
 ```js
 const skeletonGrid=()=>`<div class="grid" aria-hidden="true">${Array.from({length:8},()=>`<div class="card skeleton"><div class="sk-media"></div><div class="sk-line"></div><div class="sk-line short"></div></div>`).join("")}</div>`;
 ```
 
-- [ ] **Step 2: Use it in `route()`**
+- [x] **Step 2: Use it in `route()`**
 
 Replace the loading write:
 
@@ -1388,7 +1388,7 @@ Replace the loading write:
 $("#app").innerHTML=name==="browse"?skeletonGrid():'<div class="card empty" role="status"><p class="mute">Loading…</p></div>';
 ```
 
-- [ ] **Step 3: Add retry**
+- [x] **Step 3: Add retry**
 
 Replace `errBox`:
 
@@ -1402,7 +1402,7 @@ Add to `A`:
 retry(){route()},
 ```
 
-- [ ] **Step 4: Add skeleton CSS**
+- [x] **Step 4: Add skeleton CSS**
 
 ```css
 .skeleton{overflow:hidden}
@@ -1415,7 +1415,7 @@ retry(){route()},
 }
 ```
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: `node scripts/stress-test.mjs`
 Expected: all checks pass; `/` still boots.
@@ -1432,7 +1432,7 @@ git commit -m "feat: add storefront loading and retry states"
 **Files:**
 - Modify: `src/public/index.html`
 
-- [ ] **Step 1: Fix the completed branch and put "Awaiting you" first**
+- [x] **Step 1: Fix the completed branch and put "Awaiting you" first**
 
 In `V.seller`, replace the broken `completed:completed.includes(s)` entry with:
 
@@ -1452,7 +1452,7 @@ In `V.seller`, replace the stats row so "Awaiting you" is the first card:
 </div>
 ```
 
-- [ ] **Step 2: Use media in the listings table**
+- [x] **Step 2: Use media in the listings table**
 
 Replace `<td style="font-size:1.6rem">${pic(p)}</td>` with:
 
@@ -1460,7 +1460,7 @@ Replace `<td style="font-size:1.6rem">${pic(p)}</td>` with:
 <td>${media(p)}</td>
 ```
 
-- [ ] **Step 3: Add seller CSS**
+- [x] **Step 3: Add seller CSS**
 
 ```css
 .seller-stats .card{flex:1 1 150px}
@@ -1468,7 +1468,7 @@ Replace `<td style="font-size:1.6rem">${pic(p)}</td>` with:
 .seller-stats h2{margin:.15rem 0 0;font-size:1.55rem}
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `node scripts/stress-test.mjs`
 Expected: seller stats API checks still pass; page renders.
@@ -1486,7 +1486,7 @@ git commit -m "feat: lead seller dashboard with pending work"
 - Modify: `src/admin/routes/dashboard.ts`
 - Modify: `scripts/stress-test.mjs` (section 9)
 
-- [ ] **Step 1: Add failing dashboard assertions**
+- [x] **Step 1: Add failing dashboard assertions**
 
 In section 9 after `dash`:
 
@@ -1495,12 +1495,12 @@ ok("Dashboard shows revenue chart", dash.body.includes('data-chart="revenue"'));
 ok("Dashboard shows an order pipeline", dash.body.includes("Order pipeline"));
 ```
 
-- [ ] **Step 2: Run the harness to verify it fails**
+- [x] **Step 2: Run the harness to verify it fails**
 
 Run: `node scripts/stress-test.mjs`
 Expected: FAIL for both.
 
-- [ ] **Step 3: Replace the route**
+- [x] **Step 3: Replace the route**
 
 ```ts
 import { Router } from "express";
@@ -1609,7 +1609,7 @@ dashboardRouter.get("/", async (_req, res, next) => {
 });
 ```
 
-- [ ] **Step 4: Rebuild and commit**
+- [x] **Step 4: Rebuild and commit**
 
 Run: `npm run build`
 Expected: no TypeScript errors.
@@ -1632,7 +1632,7 @@ The assertions still fail until Task 14 updates the view.
 - Modify: `src/admin/views/product_form.ejs`
 - Modify: `src/admin/views/products.ejs`
 
-- [ ] **Step 1: Replace the dashboard view**
+- [x] **Step 1: Replace the dashboard view**
 
 ```html
 <%- include('partials/header') %>
@@ -1704,7 +1704,7 @@ The assertions still fail until Task 14 updates the view.
 <%- include('partials/footer') %>
 ```
 
-- [ ] **Step 2: Add dashboard CSS**
+- [x] **Step 2: Add dashboard CSS**
 
 ```css
 .dash-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:16px}
@@ -1721,7 +1721,7 @@ The assertions still fail until Task 14 updates the view.
 @media(max-width:900px){.dash-kpis,.pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}}
 ```
 
-- [ ] **Step 3: Use the configured currency in admin**
+- [x] **Step 3: Use the configured currency in admin**
 
 In `src/admin/app.ts`:
 
@@ -1754,7 +1754,7 @@ In `products.ejs`, change the price cell:
 <td class="text-end"><%= money(Math.round(Number(p.asking_price) * 100)) %></td>
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `npm run build`, restart the server, then `node scripts/stress-test.mjs`.
 Expected: dashboard assertions pass; all admin pages 200.
@@ -1771,7 +1771,7 @@ git commit -m "feat: rebuild dashboard around revenue and pipeline"
 **Files:**
 - Modify: `src/public/index.html`
 
-- [ ] **Step 1: Add motion tokens**
+- [x] **Step 1: Add motion tokens**
 
 To the storefront `:root`:
 
@@ -1780,7 +1780,7 @@ To the storefront `:root`:
 --dur-1:120ms; --dur-2:180ms; --dur-3:240ms;
 ```
 
-- [ ] **Step 2: Replace the entry animation block**
+- [x] **Step 2: Replace the entry animation block**
 
 Delete the existing `@media(prefers-reduced-motion:no-preference)` block containing `rise`, the eight nth-child delays and `fade`. Replace with:
 
@@ -1804,7 +1804,7 @@ Delete the existing `@media(prefers-reduced-motion:no-preference)` block contain
 }
 ```
 
-- [ ] **Step 3: Make hover lift pointer-only and quieter**
+- [x] **Step 3: Make hover lift pointer-only and quieter**
 
 Replace `.grid>.card` transition and hover rules with:
 
@@ -1824,7 +1824,7 @@ Replace button transitions:
 .toast{animation:rise 140ms var(--ease)}
 ```
 
-- [ ] **Step 4: Use View Transitions only for route changes**
+- [x] **Step 4: Use View Transitions only for route changes**
 
 Remove the existing loading write before the `try` block and show it only when the app is empty, so a View Transition snapshots the previous page:
 
@@ -1850,7 +1850,7 @@ if(document.startViewTransition&&!window.matchMedia("(prefers-reduced-motion: re
 
 Keep the surrounding `try/catch`: on error, write `errBox` directly.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: `node scripts/stress-test.mjs`
 Expected: all checks pass; no console errors on browse, product and cart routes.
@@ -1867,7 +1867,7 @@ git commit -m "feat: apply tuned quiet-motion system"
 **Files:**
 - Modify: `scripts/stress-test.mjs` (only if a check is missing)
 
-- [ ] **Step 1: Apply the migration on a clean build**
+- [x] **Step 1: Apply the migration on a clean build**
 
 ```bash
 npm run build
@@ -1876,7 +1876,7 @@ npm run migrate
 
 Expected: build succeeds; `005_product_images.sql` is already recorded or applies once.
 
-- [ ] **Step 2: Run the contrast script**
+- [x] **Step 2: Run the contrast script**
 
 ```bash
 node scripts/check-contrast.mjs
@@ -1884,7 +1884,7 @@ node scripts/check-contrast.mjs
 
 Expected: every line `PASS`; exit 0.
 
-- [ ] **Step 3: Restart and run the harness**
+- [x] **Step 3: Restart and run the harness**
 
 ```bash
 npm run start
@@ -1898,7 +1898,7 @@ node scripts/stress-test.mjs
 
 Expected: all existing checks plus the new image, currency, a11y and dashboard checks pass; exit 0.
 
-- [ ] **Step 4: Manual responsive and motion check**
+- [x] **Step 4: Manual responsive and motion check**
 
 At 390, 768 and 1440 px in light and dark:
 
@@ -1908,7 +1908,7 @@ At 390, 768 and 1440 px in light and dark:
 - With `prefers-reduced-motion: reduce`, route changes are instant and no card rises.
 - Admin dashboard shows the chart, pipeline and "Soon" labels; no broken icon boxes.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git status --short
@@ -1920,3 +1920,15 @@ Only intended files should be listed. If the harness needed a final assertion fi
 git add scripts/stress-test.mjs
 git commit -m "test: cover the refreshed UI contracts"
 ```
+
+## Execution notes (2026-11-09)
+
+All 16 tasks are complete on `ui-refresh`. Verified with `npm run build`, `npm run migrate`, `node scripts/check-contrast.mjs` (20/20) and `node scripts/stress-test.mjs` (123 passed, 0 failed).
+
+Deviations and review fixes:
+
+- `/seller/orders` also selects and returns `mo.currency`, so seller orders render in their stored currency.
+- Visual review fixes: the product fallback SVG fills the 4:5 media panel, the admin shell stacks on mobile instead of keeping a side-by-side row, revenue bars use a definite column height, and mobile chart labels are thinned.
+- A fresh server restart is needed before the final harness run to clear the in-memory login lockout left by earlier runs.
+
+Open items: none.
