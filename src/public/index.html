@@ -333,7 +333,7 @@ async function api(path,opts){const r=await fetch("/api"+path,{credentials:"same
 const call=(method,path,data)=>api(path,data===undefined?{method}:{method,headers:{"content-type":"application/json"},body:JSON.stringify(data)});
 
 /* ===== App state (boots from /api/bootstrap, a Postgres snapshot) ===== */
-let db={user:null,categories:[],methods:[],products:[]}; // users come from the session; listings live server-side
+let db={user:null,categories:[],methods:[],products:[],payment:null}; // users come from the session; listings live server-side
 function media(p, big=false){
  const title=String(p?.title??"");
  const initials=title.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"M";
@@ -457,10 +457,16 @@ V.checkout=()=>{if(!cart.items.length)return'<p>Your cart is empty.</p>';const a
  <h2 style="margin-top:1rem">Exchange method (per seller)</h2>${Object.keys(g).map(s=>`<div class="row"><strong class="sp">${esc(full(s)?.sellerName??"Seller")}</strong><select name="m${s}" style="width:auto">${db.methods.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("")}</select></div>`).join("")}</div>
  <div class="card"><h2>Order summary</h2><p>${cart.count()} items, ${Object.keys(g).length} seller(s)</p><div class="row"><strong>Total</strong><span class="sp"></span><strong>${money(cart.subtotalMinor())}</strong></div><div class="err" id="err"></div><button style="width:100%">Place order and pay</button><p class="mute">You will be redirected to the payment provider.</p></div></form>`};
 V.pay=async([id])=>{const {order:o}=await api("/order/"+encodeURIComponent(id));
- if(o.status!="pending")return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Order #${o.id} was already processed (${LABEL[o.status]??o.status}).</p><div class="row"><a class="btn" href="#/orders">View my orders</a></div></div>`;
+ if(o.status!="pending")return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment</h1><p class="mute">Order #${o.id} was already processed (${LABEL[o.status]??o.status}).</p><div class="row"><a class="btn" href="#/orders">View my orders</a></div></div>`;
+ if(db.payment?.provider==="mpesa")return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Pay with M-Pesa</h1>
+  <p class="mute">Order #${o.id} · ${money(o.totalMinor,o.currency)}</p>${o.delivery?.street?`<p class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</p>`:""}
+  <label for="phone">M-Pesa number</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="07XX XXX XXX" value="${esc(o.delivery?.phone??"")}">
+  <p class="mute">Safaricom will send a prompt to this number. Enter your M-Pesa PIN on your phone to pay.</p><div class="err" id="err"></div>
+  <button data-act="stk" data-id="${o.id}" style="width:100%">Send payment request</button>
+  <p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel order instead</button></p></div>`;
  return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Simulated provider page for order #${o.id}.</p>${o.delivery?.street?`<p class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</p>`:""}<p class="price" style="font-size:1.4rem">${money(o.totalMinor,o.currency)}</p><div class="row"><button data-act="pay" data-id="${o.id}" data-s="captured">Pay now</button><button class="ghost" data-act="pay" data-id="${o.id}" data-s="failed">Cancel payment</button></div><p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel order instead</button></p></div>`};
 V.result=async([id])=>{const {order:o}=await api("/order/"+encodeURIComponent(id));
- if(o.status=="pending"){setTimeout(()=>route(),700);return'<div class="card" style="max-width:480px;margin:2rem auto"><h1>Confirming your payment…</h1><p class="mute">Waiting for the payment provider. This page updates by itself.</p></div>'}
+ if(o.status=="pending"){const mpesa=db.payment?.provider==="mpesa";setTimeout(()=>route(),mpesa?1500:700);return `<div class="card" style="max-width:480px;margin:2rem auto"><h1>Confirming your payment…</h1><p class="mute">${mpesa?"Approve the M-Pesa prompt on your phone by entering your PIN. This page updates by itself.":"Waiting for the payment provider. This page updates by itself."}</p>${mpesa?`<p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel this order</button></p>`:""}</div>`}
  if(o.status=="cancelled")return`<div class="card" style="max-width:480px;margin:2rem auto"><h1>Payment did not go through</h1><p>Your order was not charged. Try again or change your cart.</p><div class="row"><a class="btn" href="#/pay/${o.id}">Retry payment</a><a href="#/cart">Back to cart</a></div></div>`;
  return `<div class="card" style="max-width:520px;margin:2rem auto"><h1 class="ok">Order placed</h1><p>Order #${o.id}: payment confirmed by the provider.</p>${o.sellerOrders.map(s=>`<div class="row"><span class="sp">${esc(s.sellerName)} · ${s.items.length} item(s)</span><span class="chip">${LABEL[s.fulfillment]??s.fulfillment}</span></div>`).join("")}<div class="row" style="margin-top:1rem"><a class="btn" href="#/orders">View my orders</a><a href="#/">Keep shopping</a></div></div>`};
 const stepper=s=>{const i=STEPS.indexOf(s.fulfillment);
@@ -532,6 +538,8 @@ const A={
  cancelOrder(e){if(!confirm("Cancel this unpaid order?"))return;call("POST",`/order/${e.dataset.id}/cancel`).then(()=>{toast("Order cancelled");route()}).catch(x=>toast(x.message))},
  pay(e){const id=+e.dataset.id,st=e.dataset.s;if(st=="captured")cart.clear();navbar();location.hash="#/result/"+id;
   call("POST",`/order/${id}/pay`,{result:st}).then(()=>route()).catch(x=>toast(x.message))},
+ stk(e){const id=+e.dataset.id,inp=document.getElementById("phone"),err=document.getElementById("err");if(err)err.textContent="";e.disabled=true;
+  call("POST",`/order/${id}/pay`,{phone:inp?inp.value.trim():""}).then(()=>{location.hash="#/result/"+id}).catch(x=>{e.disabled=false;if(err)err.textContent=x.message;else toast(x.message)})},
  receive(e){call("POST",`/seller-orders/${e.dataset.id}/status`,{action:"buyer:receive"}).then(()=>route()).catch(x=>toast(x.message))},
  refund(e){call("POST",`/seller-orders/${e.dataset.id}/refund`).then(()=>{route();toast("Refund requested")}).catch(x=>toast(x.message))},
  review(e){
@@ -633,7 +641,7 @@ async function route(){const [path,qs]=(location.hash.slice(1)||"/").split("?"),
 
 /* ===== Boot: pull a fresh snapshot from the Postgres-backed API ===== */
 (async function boot(){
- try{const d=await api("/bootstrap");db.user=d.user;CURRENCY=d.currency??"USD";db.categories=d.categories;db.methods=d.methods;db.products=d.products;
+ try{const d=await api("/bootstrap");db.user=d.user;CURRENCY=d.currency??"USD";db.payment=d.payment??null;db.categories=d.categories;db.methods=d.methods;db.products=d.products;
   localStorage.removeItem("mkt_db");localStorage.removeItem("mkt_uid")} // legacy demo stores are gone for good
  catch(x){toast("The market is offline — "+x.message)}
  route()})();

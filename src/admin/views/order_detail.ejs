@@ -26,8 +26,8 @@
   <h2 class="h6">Payments</h2>
   <% if (!payments.length) { %><p class="text-muted mb-0">No payment has been started for this order.</p><% } else { %>
   <div class="table-responsive"><table class="table table-sm align-middle mb-0">
-    <thead><tr><th>Provider</th><th>Status</th><th class="text-end">Amount</th><th>Created</th></tr></thead>
-    <tbody><% payments.forEach(p => { %><tr><td><%= p.provider %></td><td><%= p.status.replace('_', ' ') %></td><td class="text-end"><%= money(p.amount_minor, p.currency) %></td><td><%= fmtDate(p.created_at) %></td></tr><% }) %></tbody>
+    <thead><tr><th>Provider</th><th>Status</th><th class="text-end">Amount</th><th>Receipt</th><th>Created</th></tr></thead>
+    <tbody><% payments.forEach(p => { %><tr><td><%= p.provider %></td><td><%= p.status.replace('_', ' ') %></td><td class="text-end"><%= money(p.amount_minor, p.currency) %></td><td><%= p.provider_receipt || '-' %></td><td><%= fmtDate(p.created_at) %></td></tr><% }) %></tbody>
   </table></div><% } %>
 </div></div>
 

@@ -5,6 +5,7 @@ import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import { pool } from "../db.js";
 import { env } from "../env.js";
+import { normalisePhone, parseCallback, stkPush } from "./payments/mpesa.js";
 import "../admin/types.js"; // Express.Request.user augmentation
 
 /**
@@ -367,6 +368,7 @@ api.get("/bootstrap", asyncWrap(async (req, res) => {
   res.json({
     user,
     currency: CURRENCY,
+    payment: { provider: PAYMENT_PROVIDER, currency: CURRENCY, phoneRequired: PAYMENT_PROVIDER === "mpesa" },
     categories: data.categories,
     methods: data.methods,
     products: data.products.map(rowToProduct),
@@ -671,51 +673,313 @@ async function assertBuyerOrder(req: Request, res: Response): Promise<string | n
   return String(id);
 }
 
-/** Simulated payment provider result. */
-api.post("/order/:id/pay", asyncWrap(async (req, res) => {
-  const id = await assertBuyerOrder(req, res);
-  if (!id) return;
-  const result = (req.body as { result?: string }).result;
+// ---------- payments ----------
+
+/**
+ * Two providers share one settlement path:
+ *  - demo  : the checkout page reports the outcome (no money moves);
+ *  - mpesa : an STK Push asks the buyer for their PIN and the result arrives on
+ *            POST /api/webhooks/mpesa, which settles the same way.
+ * In both cases the payment row, the per-seller allocations and the stock reservation
+ * are written in the same transaction as the order status.
+ */
+const PAYMENT_PROVIDER = env.payments.provider;
+const MPESA = env.payments.mpesa;
+
+type Tx = import("pg").PoolClient;
+
+/** payment_provider rows are seeded by the migrations and never change at runtime. */
+const providerIds = new Map<string, string>();
+async function providerId(code: string): Promise<string> {
+  const cached = providerIds.get(code);
+  if (cached) return cached;
+  const { rows } = await q<{ payment_provider_id: string }>(
+    `SELECT payment_provider_id FROM payment_provider WHERE provider_code = $1`, [code]);
+  if (!rows.length) throw new Error(`payment_provider "${code}" is missing; run npm run migrate`);
+  providerIds.set(code, rows[0].payment_provider_id);
+  return rows[0].payment_provider_id;
+}
+
+interface Settlement {
+  providerCode: string;
+  providerRef: string;
+  idempotencyKey: string;
+  receipt?: string | null;
+  /** Money actually charged, when it differs from the order total (M-Pesa whole shillings). */
+  amountMinor?: number;
+  /** Settles an existing STK attempt instead of opening a new payment row. */
+  paymentId?: string;
+}
+
+interface PaymentRecord extends Settlement {
+  orderId: string;
+  providerIdValue: string;
+  status: string;
+  amountMinor: number;
+  currency: string;
+}
+
+/** Writes the payment row (or settles an attempt). Returns the payment id, or null when nothing changed. */
+async function recordPayment(client: Tx, p: PaymentRecord): Promise<string | null> {
+  if (p.paymentId) {
+    const updated = await client.query(
+      `UPDATE payment SET status = $2, provider_receipt = coalesce($3, provider_receipt),
+                           amount_minor = $4, provider_payment_id = coalesce(provider_payment_id, $5)
+       WHERE payment_id = $1 AND status IN ('created','requires_action')
+       RETURNING payment_id`,
+      [p.paymentId, p.status, p.receipt ?? null, p.amountMinor, p.providerRef]);
+    return updated.rows.length ? p.paymentId : null;
+  }
+  const inserted = await client.query<{ payment_id: string }>(
+    `INSERT INTO payment (order_id, payment_provider_id, provider_payment_id, provider_receipt, status,
+                          amount_minor, currency, idempotency_key)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (idempotency_key) DO NOTHING
+     RETURNING payment_id`,
+    [p.orderId, p.providerIdValue, p.providerRef, p.receipt ?? null, p.status, p.amountMinor,
+      p.currency, p.idempotencyKey]);
+  return inserted.rows[0]?.payment_id ?? null;
+}
+
+/** Splits the captured amount across the sellers so the allocations add up exactly. */
+async function allocateProceeds(
+  client: Tx, paymentId: string, orderId: string, amountMinor: number, currency: string,
+): Promise<void> {
+  const { rows } = await client.query<{ seller_order_id: string; total: string }>(
+    `SELECT so.seller_order_id, coalesce(sum(oi.line_total_minor),0)::text AS total
+     FROM seller_order so
+     JOIN seller_order_item soi ON soi.seller_order_id = so.seller_order_id
+     JOIN order_item oi ON oi.order_item_id = soi.order_item_id
+     WHERE so.order_id = $1
+     GROUP BY so.seller_order_id ORDER BY so.seller_order_id`,
+    [orderId]);
+  if (!rows.length) return;
+  const totals = rows.map((r) => Number(r.total));
+  const base = totals.reduce((a, b) => a + b, 0);
+  let left = amountMinor;
+  for (let i = 0; i < rows.length; i++) {
+    // Proportional share, and the last seller absorbs the rounding remainder.
+    const share = i === rows.length - 1
+      ? left
+      : Math.min(left, base > 0 ? Math.round((amountMinor * totals[i]) / base) : 0);
+    left -= share;
+    if (share <= 0) continue;
+    await client.query(
+      `INSERT INTO payment_allocation (payment_id, seller_order_id, allocation_type, amount_minor, currency)
+       VALUES ($1, $2, 'seller_proceeds', $3, $4)`,
+      [paymentId, rows[i].seller_order_id, share, currency]);
+  }
+}
+
+/**
+ * Marks a pending checkout paid: reserves stock, confirms the order, records the payment
+ * and splits it across the sellers. Nothing is written when the order is no longer pending.
+ */
+async function captureOrder(orderId: string, s: Settlement): Promise<"captured" | "not_pending" | "sold_out"> {
+  const providerIdValue = await providerId(s.providerCode);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const { rows } = await client.query<{ order_status: string }>(
-      `SELECT order_status FROM market_order WHERE order_id = $1 FOR UPDATE`, [id]);
-    if (rows[0]?.order_status !== "pending") {
+    const { rows } = await client.query<{ order_status: string; currency: string; total_amount_minor: string }>(
+      `SELECT order_status, currency, total_amount_minor FROM market_order WHERE order_id = $1 FOR UPDATE`,
+      [orderId]);
+    const order = rows[0];
+    if (!order || order.order_status !== "pending") {
       await client.query("ROLLBACK");
-      return void fail(res, 409, "This order was already processed.");
+      return "not_pending";
     }
-    if (result === "captured") {
-      // Reserve stock only if every line can still be covered, so two buyers can never
-      // both capture the last unit of a listing.
-      const items = await client.query<{ product_id: string; quantity: number }>(
-        `SELECT product_id, quantity FROM order_item WHERE order_id = $1 ORDER BY product_id`, [id]);
-      for (const it of items.rows) {
-        const reserved = await client.query(
-          `UPDATE product SET quantity_available = quantity_available - $2
-           WHERE product_id = $1 AND quantity_available >= $2 RETURNING product_id`,
-          [it.product_id, it.quantity]);
-        if (!reserved.rowCount) {
-          await client.query("ROLLBACK");
-          await client.query(`UPDATE market_order SET order_status='cancelled' WHERE order_id=$1 AND order_status='pending'`, [id]);
-          await client.query(`UPDATE seller_order SET fulfillment_status='cancelled' WHERE order_id=$1`, [id]);
-          return void fail(res, 409, "An item in this order just sold out, so the payment was not captured.");
-        }
+    const amountMinor = s.amountMinor ?? Number(order.total_amount_minor);
+
+    // Reserve stock only if every line can still be covered, so two buyers can never
+    // both capture the last unit of a listing.
+    const items = await client.query<{ product_id: string; quantity: number }>(
+      `SELECT product_id, quantity FROM order_item WHERE order_id = $1 ORDER BY product_id`, [orderId]);
+    for (const it of items.rows) {
+      const reserved = await client.query(
+        `UPDATE product SET quantity_available = quantity_available - $2
+         WHERE product_id = $1 AND quantity_available >= $2 RETURNING product_id`,
+        [it.product_id, it.quantity]);
+      if (!reserved.rowCount) {
+        await client.query("ROLLBACK");
+        await client.query(`UPDATE market_order SET order_status='cancelled' WHERE order_id=$1 AND order_status='pending'`, [orderId]);
+        await client.query(`UPDATE seller_order SET fulfillment_status='cancelled' WHERE order_id=$1`, [orderId]);
+        return "sold_out";
       }
-      await client.query(`UPDATE market_order SET order_status='confirmed' WHERE order_id=$1`, [id]);
-    } else {
-      await client.query(`UPDATE market_order SET order_status='cancelled' WHERE order_id=$1`, [id]);
-      await client.query(`UPDATE seller_order SET fulfillment_status='cancelled' WHERE order_id=$1`, [id]);
     }
+    const paymentId = await recordPayment(client, {
+      ...s, orderId, providerIdValue, status: "captured", amountMinor, currency: order.currency,
+    });
+    if (paymentId) await allocateProceeds(client, paymentId, orderId, amountMinor, order.currency);
+    await client.query(`UPDATE market_order SET order_status='confirmed' WHERE order_id=$1`, [orderId]);
     await client.query("COMMIT");
-    invalidateCatalogue();
+    return "captured";
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;
   } finally {
     client.release();
   }
+}
+
+/** Demo provider saying "payment failed": cancels the unpaid order and records the attempt. */
+async function failDemoPayment(orderId: string, s: Settlement): Promise<"cancelled" | "not_pending"> {
+  const providerIdValue = await providerId(s.providerCode);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{ order_status: string; currency: string; total_amount_minor: string }>(
+      `SELECT order_status, currency, total_amount_minor FROM market_order WHERE order_id = $1 FOR UPDATE`, [orderId]);
+    const order = rows[0];
+    if (!order || order.order_status !== "pending") {
+      await client.query("ROLLBACK");
+      return "not_pending";
+    }
+    await recordPayment(client, {
+      ...s, orderId, providerIdValue, status: "failed",
+      amountMinor: Number(order.total_amount_minor), currency: order.currency,
+    });
+    await client.query(`UPDATE market_order SET order_status='cancelled' WHERE order_id=$1`, [orderId]);
+    await client.query(`UPDATE seller_order SET fulfillment_status='cancelled' WHERE order_id=$1`, [orderId]);
+    await client.query("COMMIT");
+    return "cancelled";
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/** Opens an STK Push for a pending order. The order is confirmed later, by the callback. */
+async function startMpesaPayment(req: Request, res: Response, orderId: string): Promise<void> {
+  const raw = (req.body as { phone?: unknown } | undefined)?.phone;
+  const phone = normalisePhone(typeof raw === "string" ? raw : "");
+  if (!phone) return void fail(res, 400, "Enter a valid Safaricom number, for example 0712 345 678.");
+
+  const { rows } = await q<{ order_status: string; currency: string; total_amount_minor: string }>(
+    `SELECT order_status, currency, total_amount_minor FROM market_order WHERE order_id = $1`, [orderId]);
+  const order = rows[0];
+  if (!order) return void fail(res, 404, "Order not found.");
+  if (order.order_status !== "pending") return void fail(res, 409, "This order was already processed.");
+
+  // A second push while one is waiting for the PIN just spams the buyer's phone.
+  const open = await q<{ n: string }>(
+    `SELECT count(*)::text AS n FROM payment
+     WHERE order_id = $1 AND status IN ('created','requires_action')`, [orderId]);
+  if (Number(open.rows[0]?.n ?? 0) > 0) {
+    return void fail(res, 409, "A payment request is already open for this order. Approve it on your phone, or wait a minute and try again.");
+  }
+
+  // M-Pesa charges whole shillings only.
+  const amount = Math.round(Number(order.total_amount_minor) / 100);
+  if (amount < 1) return void fail(res, 409, "M-Pesa only accepts charges of KES 1 or more.");
+
+  const paymentId = (await q<{ payment_id: string }>(
+    `INSERT INTO payment (order_id, payment_provider_id, status, amount_minor, currency, idempotency_key)
+     VALUES ($1, $2, 'created', $3, $4, $5) RETURNING payment_id`,
+    [orderId, await providerId("mpesa"), amount * 100, order.currency,
+      `mpesa:${orderId}:${crypto.randomUUID()}`],
+  )).rows[0].payment_id;
+
+  try {
+    const stk = await stkPush(MPESA, {
+      phone,
+      amount,
+      accountRef: `ORD-${orderId}`,
+      description: "Market order",
+    });
+    await q(`UPDATE payment SET status='requires_action', provider_payment_id=$2 WHERE payment_id=$1`,
+      [paymentId, stk.checkoutRequestId]);
+    res.json({ pending: true, checkoutRequestId: stk.checkoutRequestId, message: stk.customerMessage });
+  } catch (e) {
+    await q(`UPDATE payment SET status='failed' WHERE payment_id=$1`, [paymentId]);
+    console.error("mpesa stk push failed:", e instanceof Error ? e.message : e);
+    fail(res, 502, "M-Pesa did not accept the request. Check the number and try again.");
+  }
+}
+
+/** Payment entry point: the configured provider decides what happens next. */
+api.post("/order/:id/pay", asyncWrap(async (req, res) => {
+  const id = await assertBuyerOrder(req, res);
+  if (!id) return;
+  if (PAYMENT_PROVIDER === "mpesa") return void await startMpesaPayment(req, res, id);
+
+  const result = (req.body as { result?: string }).result;
+  const settlement: Settlement = {
+    providerCode: "demo",
+    providerRef: `demo-${crypto.randomUUID()}`,
+    idempotencyKey: `demo:${id}:${crypto.randomUUID()}`,
+  };
+  if (result === "captured") {
+    const outcome = await captureOrder(id, settlement);
+    if (outcome === "sold_out") {
+      return void fail(res, 409, "An item in this order just sold out, so the payment was not captured.");
+    }
+    if (outcome === "not_pending") return void fail(res, 409, "This order was already processed.");
+    invalidateCatalogue();
+  } else {
+    const outcome = await failDemoPayment(id, settlement);
+    if (outcome === "not_pending") return void fail(res, 409, "This order was already processed.");
+  }
   res.json({ order: await orderView(id) });
+}));
+
+/**
+ * Daraja posts the STK result here. It retries until it gets a 200, so unknown and
+ * duplicate notifications are acknowledged and ignored instead of being retried forever.
+ */
+api.post("/webhooks/mpesa", asyncWrap(async (req, res) => {
+  const cb = parseCallback(req.body);
+  if (!cb) return void res.status(200).json({ ResultCode: 0, ResultDesc: "Ignored" });
+
+  const providerIdValue = await providerId("mpesa");
+  const { rows } = await q<{ payment_id: string; order_id: string; amount_minor: string }>(
+    `SELECT payment_id, order_id, amount_minor FROM payment
+     WHERE payment_provider_id = $1 AND provider_payment_id = $2`,
+    [providerIdValue, cb.checkoutRequestId]);
+  const pay = rows[0];
+  if (!pay) {
+    console.warn("mpesa callback for an unknown checkout", cb.checkoutRequestId, cb.resultDesc);
+    return void res.status(200).json({ ResultCode: 0, ResultDesc: "Unknown payment" });
+  }
+
+  // Replays are absorbed by the unique (provider, event) key on provider_event.
+  const event = await q<{ provider_event_row_id: string }>(
+    `INSERT INTO provider_event (payment_provider_id, provider_event_id, event_type, resource_type,
+                                 resource_id, payload_hash)
+     VALUES ($1, $2, 'stk.callback', 'payment', $3, $4)
+     ON CONFLICT (payment_provider_id, provider_event_id) DO NOTHING
+     RETURNING provider_event_row_id`,
+    [providerIdValue, `${cb.checkoutRequestId}:${cb.resultCode}:${cb.receipt ?? ""}`, pay.payment_id,
+      crypto.createHash("sha256").update(JSON.stringify(req.body ?? {})).digest()]);
+  if (!event.rows.length) return void res.status(200).json({ ResultCode: 0, ResultDesc: "Already processed" });
+
+  if (cb.resultCode === 0) {
+    const outcome = await captureOrder(pay.order_id, {
+      providerCode: "mpesa",
+      providerRef: cb.checkoutRequestId,
+      receipt: cb.receipt,
+      idempotencyKey: `mpesa:capture:${cb.checkoutRequestId}`,
+      amountMinor: Number(pay.amount_minor),
+      paymentId: pay.payment_id,
+    });
+    if (outcome === "captured") {
+      invalidateCatalogue();
+    } else {
+      // Money left the buyer but the order could no longer take it (sold out, cancelled).
+      // Keep that fact on the payment row so an admin can refund it.
+      await q(`UPDATE payment SET status='captured', provider_receipt=coalesce($2, provider_receipt)
+               WHERE payment_id=$1`, [pay.payment_id, cb.receipt]);
+      console.warn(`mpesa charged KES ${Number(pay.amount_minor) / 100} for order ${pay.order_id} (${outcome}); needs a manual refund`);
+    }
+  } else {
+    // Buyer dismissed the prompt or it timed out: keep the order open so they can retry.
+    await q(`UPDATE payment SET status='failed' WHERE payment_id=$1 AND status IN ('created','requires_action')`,
+      [pay.payment_id]);
+  }
+  await q(`UPDATE provider_event SET processing_status='processed', processed_at=now()
+           WHERE provider_event_row_id=$1`, [event.rows[0].provider_event_row_id]);
+  res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
 }));
 
 /** Buyer cancels an unpaid order. Nothing was reserved, so no stock needs restoring. */

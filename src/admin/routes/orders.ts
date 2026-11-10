@@ -99,7 +99,8 @@ ordersRouter.get(
 
     const payments = (
       await query(
-        `SELECT pa.payment_id, pa.status, pa.amount_minor, pa.currency, pa.created_at, pp.display_name AS provider
+        `SELECT pa.payment_id, pa.status, pa.amount_minor, pa.currency, pa.created_at, pa.provider_receipt,
+                pp.display_name AS provider
          FROM payment pa JOIN payment_provider pp ON pp.payment_provider_id = pa.payment_provider_id
          WHERE pa.order_id = $1 ORDER BY pa.created_at, pa.payment_id`,
         [id],

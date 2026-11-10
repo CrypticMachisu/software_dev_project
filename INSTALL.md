@@ -40,3 +40,36 @@ and 002_admin_additions.sql, which your migrate script already applies.
 - If you already have a src/admin/util.ts of your own, rename mine and update the imports in the 4 route files.
 - Your own pages can use the same confirm dialogs and messages: put <%- include('partials/page-tools') %>
   right after the header include, and data-confirm="Are you sure?" on a form.
+
+## Real M-Pesa payments (Daraja sandbox)
+
+The storefront ships with a simulated `demo` provider so the app runs with no credentials.
+Switching to M-Pesa only needs a **free Safaricom developer account** — no business
+registration, no paybill. That is only required for Go Live (real money).
+
+1. Sign in at https://developer.safaricom.co.ke, open **My Apps → Create App**, and add the
+   **M-Pesa Express** (Lipa na M-Pesa Online) product.
+2. Copy the app's **Consumer Key** and **Consumer Secret**. In the sandbox use shortcode
+   `174379` and the sandbox **passkey** shown on the M-Pesa Express / simulator section.
+3. Daraja has to reach the callback, so expose the app and use the public URL:
+
+       npx ngrok http 3000
+
+4. Add these to `.env` (then run `npm run migrate` once and restart):
+
+       PAYMENT_PROVIDER=mpesa
+       APP_CURRENCY=KES
+       MPESA_CONSUMER_KEY=...
+       MPESA_CONSUMER_SECRET=...
+       MPESA_SHORTCODE=174379
+       MPESA_PASSKEY=...
+       MPESA_CALLBACK_URL=https://<your-ngrok-id>.ngrok-free.app/api/webhooks/mpesa
+       # MPESA_ENV=sandbox   (default; use production only with a paybill)
+
+Charge flow: the buyer enters their number on `#/pay/:id`, Safaricom sends the STK prompt,
+`POST /api/webhooks/mpesa` settles the order (stock, `payment`, `payment_allocation`,
+`provider_event`) and the result page polls until it flips to confirmed. Sandbox test
+amounts are reversed by Safaricom, usually the next morning.
+
+Switching `PAYMENT_PROVIDER` back to `demo` restores the simulated checkout, so a demo
+never depends on the sandbox.
