@@ -172,10 +172,10 @@ usersRouter.post(
   wrap(async (req, res) => {
     const b = body(req);
     const name = str(b.name);
-    const email = str(b.email);
+    const email = str(b.email).toLowerCase(); // same normalisation as self-registration
     const phone = str(b.phone);
     const password = typeof b.password === "string" ? b.password : "";
-    const picked = ([] as string[]).concat(b.roles ?? []).filter((r) => ROLES.includes(r));
+    const picked = [...new Set(([] as string[]).concat(b.roles ?? []).filter((r) => ROLES.includes(r)))];
     const form = { name, email, phone, roles: picked };
 
     if (name.length < 2 || name.length > 150) return renderNew(req, res, "Enter the user's full name.", form);
@@ -193,11 +193,14 @@ usersRouter.post(
           [name, email, hash, phone || null],
         );
         const id = u.rows[0]?.user_id ?? "";
-        await c.query(
+        const granted = await c.query(
           `INSERT INTO user_role (user_id, role_id, approval_status)
            SELECT $1, role_id, 'approved' FROM app_role WHERE role_name = ANY($2::text[])`,
           [id, picked],
         );
+        // A missing role row (migrations not applied) must not leave a user with no access:
+        // throwing rolls the whole account back, so nothing half-saved reaches the database.
+        if (granted.rowCount !== picked.length) throw new Error(`app_role is missing one of: ${picked.join(", ")}`);
         await logAction(c, req.user?.user_id ?? "", "user.created", "app_user", id, req.ip, `roles: ${picked.join(", ")}`);
         return id;
       });

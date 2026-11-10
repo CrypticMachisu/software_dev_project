@@ -1,12 +1,21 @@
 import http from "node:http";
 import path from "node:path";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { api, expireStaleOrders } from "./api/index.js";
 import { adminApp } from "./admin/app.js";
 import { pool } from "./db.js";
 import { env } from "./env.js";
 
 const port = Number(process.env.PORT ?? 3000);
+
+/** True when the request carries `Authorization: Bearer <HEALTH_TOKEN>` (compared in constant time). */
+function isHealthAdmin(header: string | undefined): boolean {
+  if (!env.healthToken || !header?.startsWith("Bearer ")) return false;
+  const given = Buffer.from(header.slice("Bearer ".length).trim());
+  const want = Buffer.from(env.healthToken);
+  return given.length === want.length && crypto.timingSafeEqual(given, want);
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -44,35 +53,42 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 4. Health check route
+  // 4. Health check route. Anyone may ask "is it up?"; only a caller holding HEALTH_TOKEN
+  //    learns the database name, table count or role list.
   if (req.method === "GET" && url.pathname === "/health") {
     try {
-      const ping = await pool.query<{ ok: number; db: string }>(
-        "SELECT 1 AS ok, current_database() AS db",
-      );
-      const roles = await pool.query<{ role_name: string }>(
-        "SELECT role_name FROM app_role ORDER BY role_name",
-      );
-      const tables = await pool.query<{ count: string }>(
-        `SELECT COUNT(*)::text AS count
-         FROM information_schema.tables
-         WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`,
-      );
-      const body = {
-        ok: true,
-        service: "postgres",
-        branch: env.branch?.name ?? null,
-        database: ping.rows[0]?.db,
-        ping: ping.rows[0]?.ok,
-        publicTables: Number(tables.rows[0]?.count ?? 0),
-        roles: roles.rows.map((r) => r.role_name),
-      };
-      res.writeHead(200, { "content-type": "application/json" });
+      await pool.query("SELECT 1");
+      let body: Record<string, unknown> = { ok: true };
+      if (isHealthAdmin(req.headers.authorization)) {
+        const ping = await pool.query<{ ok: number; db: string }>(
+          "SELECT 1 AS ok, current_database() AS db",
+        );
+        const roles = await pool.query<{ role_name: string }>(
+          "SELECT role_name FROM app_role ORDER BY role_name",
+        );
+        const tables = await pool.query<{ count: string }>(
+          `SELECT COUNT(*)::text AS count
+           FROM information_schema.tables
+           WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`,
+        );
+        body = {
+          ok: true,
+          service: "postgres",
+          branch: env.branch?.name ?? null,
+          database: ping.rows[0]?.db,
+          ping: ping.rows[0]?.ok,
+          publicTables: Number(tables.rows[0]?.count ?? 0),
+          roles: roles.rows.map((r) => r.role_name),
+        };
+      }
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       res.end(JSON.stringify(body));
       return;
     } catch (err) {
-      res.writeHead(503, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: false, error: String(err) }));
+      // The cause goes to the log, never to the caller.
+      console.error("health check failed", err);
+      res.writeHead(503, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ ok: false }));
       return;
     }
   }

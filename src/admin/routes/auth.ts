@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { Router } from "express";
 import type { Request, Response } from "express";
+import { csrfMatches, sidOf } from "../../csrf.js";
 import { IDLE_MINUTES, hashToken } from "../auth.js";
 import { logAction, query } from "../db-helpers.js";
 import { verifyCode } from "../totp.js";
@@ -85,7 +86,7 @@ authRouter.post("/login", async (req, res, next) => {
     }>(
       `SELECT u.user_id, u.password_hash, u.account_status, u.totp_secret, array_agg(r.role_name) AS roles
        FROM app_user u
-       JOIN user_role ur ON ur.user_id = u.user_id
+       JOIN user_role ur ON ur.user_id = u.user_id AND ur.approval_status = 'approved'
        JOIN app_role r   ON r.role_id  = ur.role_id
        WHERE lower(u.email) = lower($1)
        GROUP BY u.user_id`,
@@ -179,8 +180,16 @@ authRouter.post("/2fa", async (req, res, next) => {
 
 authRouter.post("/logout", async (req, res, next) => {
   try {
-    const token = (req.cookies as Record<string, string> | undefined)?.sid;
+    const token = sidOf(req);
     if (token) {
+      // A page on another site must not be able to sign an admin out.
+      if (!csrfMatches(token, (req.body as Record<string, unknown> | undefined)?._csrf)) {
+        res.status(403).render("error", {
+          title: "Security check failed",
+          message: "Go back, refresh the page and try again.",
+        });
+        return;
+      }
       await query(
         `UPDATE auth_session SET revoked_at = now()
          WHERE refresh_token_hash = $1 AND revoked_at IS NULL`,

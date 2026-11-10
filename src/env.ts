@@ -2,10 +2,24 @@
 const currencyRaw = (process.env.APP_CURRENCY ?? "USD").trim().toUpperCase();
 const providerRaw = (process.env.PAYMENT_PROVIDER ?? "demo").trim().toLowerCase();
 const mpesaEnvRaw = (process.env.MPESA_ENV ?? "sandbox").trim().toLowerCase();
+const mailRaw = (process.env.MAIL_PROVIDER ?? "log").trim().toLowerCase();
 
 export const env = {
   branch: null as { name: string } | null,
   currency: /^[A-Z]{3}$/.test(currencyRaw) ? currencyRaw : "USD",
+  /** Public https URL of the deployment, used in emailed links (never taken from the Host header). */
+  appUrl: (process.env.APP_URL ?? "").trim().replace(/\/+$/, ""),
+  /** When set, GET /health with `Authorization: Bearer <token>` returns diagnostics; anonymous callers get {ok}. */
+  healthToken: (process.env.HEALTH_TOKEN ?? "").trim(),
+  /** Set RATE_LIMIT_OFF=true only for load tests against a scratch database. */
+  rateLimitOff: process.env.RATE_LIMIT_OFF === "true",
+  mail: {
+    /** "log" prints to the server console (development); "resend" sends through the Resend HTTP API. */
+    provider: (mailRaw === "resend" ? "resend" : "log") as "log" | "resend",
+    apiKey: (process.env.RESEND_API_KEY ?? "").trim(),
+    /** Sender shown to the user, e.g. "M-DUKA <no-reply@yourdomain.com>". Must be a verified Resend sender. */
+    from: (process.env.MAIL_FROM ?? "").trim(),
+  },
   postgres: {
     databaseUrl: process.env.DATABASE_URL ?? "",
     databaseUrlUnpooled: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL ?? "",
@@ -45,5 +59,14 @@ if (env.payments.provider === "mpesa") {
   // M-Pesa charges Kenya shillings only, in whole shillings.
   if (env.currency !== "KES") {
     throw new Error("M-Pesa charges in KES, so set APP_CURRENCY=KES when PAYMENT_PROVIDER=mpesa.");
+  }
+}
+
+if (env.mail.provider === "resend") {
+  if (!env.mail.apiKey) throw new Error("MAIL_PROVIDER=resend needs RESEND_API_KEY in .env");
+  if (!env.mail.from) throw new Error("MAIL_PROVIDER=resend needs MAIL_FROM in .env");
+  // A reset link built from the Host header can be poisoned by the sender of the request.
+  if (!/^https?:\/\//i.test(env.appUrl)) {
+    throw new Error("MAIL_PROVIDER=resend needs APP_URL (for example https://mduka.onrender.com) so emailed links are trustworthy.");
   }
 }

@@ -21,10 +21,21 @@ Architecture, database diagrams and the money model are covered in [`README.md`]
   | Jane | `jane@example.com` | `password123` | buyer |
   | Sam | `sam@example.com` | `password123` | seller |
 
+- Optional demo super admin: `DEMO_ADMIN_PASSWORD='a-long-password' npm run demo:seed` also creates
+  `superadmin@example.com`. The password is never hard-coded.
 - An admin account is created with `npm run admin:seed -- "Name" email@example.com "Password"` and
   can hold the `admin` and/or `super_admin` roles.
 - One currency per deployment is displayed (`APP_CURRENCY`); the payment provider is `demo`
   (simulated) unless `PAYMENT_PROVIDER=mpesa`.
+
+### Registering and recovering your password
+
+- **Register** on the storefront (*Log in → Register*): name, email and a password of at least 8
+  characters. The account is saved at once, you are signed in, and you start as a buyer.
+- **Forgot your password?** Under *Log in*, choose *Forgot your password?* and enter your email.
+  If it matches an account you receive a link that works once and expires after 60 minutes; open it
+  and choose a new password. You are signed out of every device. The page gives the same answer
+  whether or not the address is registered, so it cannot be used to find out who has an account.
 
 ## 2. Storefront — buying
 
@@ -88,8 +99,10 @@ fulfilment pipeline, recent orders and low-stock listings with a *Restock* short
 - **Suspend** signs the user out everywhere immediately. Reactivating does not restore old
   sessions; the user signs in again.
 - **Password reset link.** The link is shown once, expires after a short period and works once.
-  Send it to the user yourself — the app does not send email. The user chooses a new password and
-  is signed out of all devices.
+  Use it when a user cannot receive email. The user chooses a new password and is signed out of
+  all devices. Users can also recover on their own: see *Forgot your password?* below.
+- **Every account you create is saved to the database immediately** and appears in the list with
+  its roles; the action is recorded in the audit log with your name.
 
 ### 4.3 Products and categories
 
@@ -186,7 +199,11 @@ requires a signed-in session; super-admin-only routes also check the role on eac
 | Payment taken but the order stays pending | M-Pesa callback did not arrive or did not match the amount. Check the provider dashboard and the payment rows; reconcile manually. |
 | Refund button missing | The seller was already paid out; reverse the payout first, or the slice is not completed yet. |
 | Payout action refuses | The money is not eligible yet, a refund request is open, or the reference was already used. |
-| Reset link says it is invalid | It expired or was already used. Issue a new link from the user's page. |
+| Reset link says it is invalid | It expired or was already used. Ask for a new one on the login page, or issue one from the user's page. |
+| "Too many requests" (429) | The rate limit for sign-up, reset, checkout or payment was reached. Wait a few minutes. |
+| "Your page is out of date. Reload and try again." | The session changed in another tab (signed in or out). Reload the page. |
+| "Security check failed" in the admin panel | The form was open for a long time or the session changed. Go back, refresh the page and submit again. |
+| Reset email never arrives | Check spam; ask an admin to confirm `MAIL_PROVIDER` is configured, or use an admin-issued reset link. |
 | Sessions gone after a restart | Admin and API sessions are database-backed; a suspension or password reset revokes them by design. |
 | Images do not load | Image URLs must start with `http://` or `https://`. |
 | Sign-in asks for a code I cannot produce | The authenticator is lost or was reset. Ask a super admin to use **Reset 2FA** on your account, then sign in with your password. |

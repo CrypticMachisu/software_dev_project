@@ -3,6 +3,10 @@
  * End-to-end audit + stress test for the M-DUKA storefront and admin panel.
  * Usage: node scripts/stress-test.mjs   (BASE_URL defaults to http://127.0.0.1:3003)
  * Requires the server to be running and the demo data seeded.
+ *
+ * Start the server with RATE_LIMIT_OFF=true (scratch database only): this harness registers and
+ * pays far faster than the production rate limits allow. Section 12 checks CSRF and the other
+ * hardening and does not need the limiter off.
  */
 const BASE = process.env.BASE_URL || "http://127.0.0.1:3003";
 let pass = 0;
@@ -14,7 +18,7 @@ const ok = (name, cond, extra = "") => {
 const section = (s) => console.log("\n### " + s);
 
 class Jar {
-  constructor() { this.cookies = new Map(); }
+  constructor() { this.cookies = new Map(); this.csrf = null; this.adminCsrfFor = null; this.adminCsrf = null; }
   header() { return [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; "); }
   absorb(res) {
     const list = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
@@ -33,6 +37,17 @@ class Jar {
     if (json !== undefined) { h["content-type"] = "application/json"; payload = JSON.stringify(json); }
     else if (form !== undefined) { h["content-type"] = "application/x-www-form-urlencoded"; payload = new URLSearchParams(form).toString(); }
     if (this.cookies.size) h.cookie = this.header();
+    // Mirror the real clients: the storefront sends x-csrf-token, admin forms carry a hidden _csrf field.
+    if (method !== "GET" && path.startsWith("/api/") && this.csrf && !h["x-csrf-token"]) h["x-csrf-token"] = this.csrf;
+    if (method !== "GET" && form !== undefined && path.startsWith("/admin/") && !/^\/admin\/(login|2fa|reset)/.test(path) && !("_csrf" in form)) {
+      const sid = this.cookies.get("sid");
+      if (sid && this.adminCsrfFor !== sid) {
+        const page = await fetch(BASE + "/admin", { headers: { cookie: this.header() }, redirect: "manual" });
+        this.adminCsrf = (await page.text()).match(/name="_csrf" value="([0-9a-f]+)"/)?.[1] ?? null;
+        this.adminCsrfFor = sid;
+      }
+      if (this.adminCsrf) { form = { ...form, _csrf: this.adminCsrf }; payload = new URLSearchParams(form).toString(); }
+    }
     const t0 = performance.now();
     const res = await fetch(BASE + path, { method, headers: h, body: payload, redirect });
     const ms = performance.now() - t0;
@@ -43,6 +58,7 @@ class Jar {
     const { res, ms } = await this.req(path, opts);
     let data = null;
     try { data = await res.json(); } catch { /* non-JSON */ }
+    if (data && "csrfToken" in data) this.csrf = data.csrfToken;
     return { status: res.status, data, headers: res.headers, ms };
   }
   async text(path, opts) {
@@ -430,6 +446,55 @@ async function main() {
     // stress admin has no buyer role
     const r = await j.json("/api/checkout", { method: "POST", json: { items: [{ productId: listingId, quantity: 1 }], address: { name: "A", street: "B" } } });
     ok("Account without buyer role gets a clear 403 at checkout", r.status === 403, `status ${r.status}`);
+  }
+
+  section("12. CSRF, recovery and hardening");
+  {
+    // Storefront API: a session cookie without the token is refused, with it the call works.
+    const j = new Jar();
+    const reg = await register(j, "csrf");
+    ok("Register hands out a csrfToken", reg.status === 201 && typeof reg.data?.csrfToken === "string");
+    const goodToken = j.csrf;
+    j.csrf = null;
+    const noTok = await j.json("/api/roles/seller", { method: "POST" });
+    ok("State-changing API call without token is refused (403 csrf)", noTok.status === 403 && noTok.data?.code === "csrf", `status ${noTok.status}`);
+    j.csrf = "0".repeat(64);
+    const badTok = await j.json("/api/roles/seller", { method: "POST" });
+    ok("Wrong token is refused (403)", badTok.status === 403, `status ${badTok.status}`);
+    j.csrf = goodToken;
+    const goodTok = await j.json("/api/roles/seller", { method: "POST" });
+    ok("Correct token is accepted", goodTok.status === 200, `status ${goodTok.status}`);
+    const me = await j.json("/api/me");
+    ok("/api/me returns the same token for the same session", me.data?.csrfToken === goodToken);
+
+    // Admin panel: forms without _csrf are refused.
+    const admin = new Jar();
+    await admin.req("/admin/login", { method: "POST", form: { email: "stress-admin@example.com", password: "StressPass123!" } });
+    const dash = await admin.text("/admin");
+    ok("Admin pages carry a hidden _csrf field in POST forms", /name="_csrf" value="[0-9a-f]{64}"/.test(dash.body));
+    const sid = admin.cookies.get("sid");
+    const raw = await fetch(BASE + "/admin/users/new", {
+      method: "POST", redirect: "manual",
+      headers: { cookie: `sid=${sid}`, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ name: "No Token", email: uniq("notoken"), password: PW, roles: "buyer" }).toString(),
+    });
+    ok("Admin POST without _csrf is refused (403)", raw.status === 403, `status ${raw.status}`);
+
+    // Recovery: identical answer for known and unknown addresses (no account enumeration).
+    const known = await anon.json("/api/auth/forgot", { method: "POST", json: { email: reg.email } });
+    const unknown = await anon.json("/api/auth/forgot", { method: "POST", json: { email: uniq("nobody") } });
+    ok("Forgot-password answers the same for known and unknown emails",
+      known.status === 200 && unknown.status === 200 && JSON.stringify(known.data) === JSON.stringify(unknown.data));
+    const badReset = await anon.json("/api/auth/reset", { method: "POST", json: { token: "f".repeat(64), password: PW } });
+    ok("Reset with an unknown token is refused (410)", badReset.status === 410, `status ${badReset.status}`);
+    const junkReset = await anon.json("/api/auth/reset", { method: "POST", json: { token: "nope", password: PW } });
+    ok("Reset with a malformed token is refused (400)", junkReset.status === 400, `status ${junkReset.status}`);
+
+    // Disclosure and pagination.
+    const health = await anon.json("/health");
+    ok("Anonymous /health discloses nothing but ok", health.status === 200 && JSON.stringify(health.data) === '{"ok":true}', JSON.stringify(health.data));
+    const page = await j.json("/api/orders?page=1&pageSize=5");
+    ok("GET /api/orders is paginated", page.status === 200 && Array.isArray(page.data?.orders) && page.data.pageSize === 5 && typeof page.data.total === "number");
   }
 
   console.log(`\n================ RESULT: ${pass} passed, ${failures.length} failed ================`);

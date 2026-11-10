@@ -5,6 +5,10 @@ import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import { pool } from "../db.js";
 import { env } from "../env.js";
+import { SAFE_METHODS, csrfMatches, csrfTokenFor, sidOf } from "../csrf.js";
+import { passwordResetMail, sendMail } from "../mail.js";
+import { rateLimit } from "../ratelimit.js";
+import { logAction } from "../admin/db-helpers.js";
 import { normalisePhone, parseCallback, stkPush } from "./payments/mpesa.js";
 import "../admin/types.js"; // Express.Request.user augmentation
 
@@ -18,6 +22,20 @@ export const api = express();
 
 api.use(cookieParser());
 api.use(express.json({ limit: "100kb" }));
+
+/**
+ * CSRF: every state-changing call made with a session cookie must carry the matching
+ * `x-csrf-token` header (the server hands the token out in /bootstrap, /me, login and register).
+ * Calls with no session are left to the handler, which answers 401; sign-in, registration and
+ * password recovery have no session yet, and the M-Pesa webhook is server-to-server.
+ */
+const CSRF_EXEMPT = [/^\/auth\/(login|register|forgot|reset)\/?$/, /^\/webhooks\/mpesa(\/|$)/];
+api.use((req, res, next) => {
+  if (SAFE_METHODS.has(req.method) || CSRF_EXEMPT.some((re) => re.test(req.path))) return next();
+  const sid = sidOf(req);
+  if (!sid || csrfMatches(sid, req.get("x-csrf-token"))) return next();
+  res.status(403).json({ error: "Your page is out of date. Reload and try again.", code: "csrf" });
+});
 // Behind ngrok or any reverse proxy the client address arrives in X-Forwarded-For;
 // without this every audit and login attempt records the proxy's IP instead.
 if (process.env.TRUST_PROXY === "true" || process.env.NODE_ENV === "production") api.set("trust proxy", 1);
@@ -224,8 +242,10 @@ function sendSessionCookie(res: Response, token: string): void {
   });
 }
 
-async function startSession(res: Response, userId: string): Promise<void> {
-  sendSessionCookie(res, await createSession(userId));
+async function startSession(res: Response, userId: string): Promise<string> {
+  const token = await createSession(userId);
+  sendSessionCookie(res, token);
+  return token;
 }
 
 const loadUser = async (userId: string): Promise<ApiUser> => {
@@ -261,17 +281,34 @@ async function sessionUser(token: string): Promise<ApiUser | null> {
 
 api.get("/me", asyncWrap(async (req, res) => {
   const token = (req.cookies as Record<string, string> | undefined)?.sid;
-  if (!token) return void res.json({ user: null });
+  if (!token) return void res.json({ user: null, csrfToken: null });
   const { rows } = await q<{ user_id: string; account_status: string }>(
     `SELECT s.user_id, u.account_status FROM auth_session s
      JOIN app_user u ON u.user_id = s.user_id
      WHERE s.refresh_token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()`,
     [hashToken(token)],
   );
-  res.json({ user: rows[0]?.account_status === "active" ? await loadUser(rows[0].user_id) : null });
+  res.json({
+    user: rows[0]?.account_status === "active" ? await loadUser(rows[0].user_id) : null,
+    csrfToken: csrfTokenFor(token),
+  });
 }));
 
-api.post("/auth/register", asyncWrap(async (req, res) => {
+// Scripted sign-ups fill the database with junk accounts; 10 per 10 minutes per address is
+// far above what a class sharing one network needs for a demo.
+const registerLimit = rateLimit({ name: "register", windowMs: 10 * 60_000, max: 10, message: "Too many sign-ups from this network. Try again in a few minutes." });
+const loginLimit = rateLimit({ name: "login", windowMs: 15 * 60_000, max: 40, message: "Too many sign-in attempts. Try again in 15 minutes." });
+const forgotIpLimit = rateLimit({ name: "forgot-ip", windowMs: 15 * 60_000, max: 8, message: "Too many reset requests. Try again in a few minutes." });
+const forgotMailLimit = rateLimit({
+  name: "forgot-email", windowMs: 60 * 60_000, max: 3,
+  key: (req) => String((req.body as { email?: unknown } | undefined)?.email ?? "").trim().toLowerCase(),
+  message: "Too many reset requests for that address. Try again in an hour.",
+});
+const resetLimit = rateLimit({ name: "reset", windowMs: 15 * 60_000, max: 10, message: "Too many attempts. Try again in a few minutes." });
+const checkoutLimit = rateLimit({ name: "checkout", windowMs: 10 * 60_000, max: 30, message: "Too many checkouts. Try again in a few minutes." });
+const payLimit = rateLimit({ name: "pay", windowMs: 10 * 60_000, max: 15, message: "Too many payment attempts. Wait a few minutes before trying again." });
+
+api.post("/auth/register", registerLimit, asyncWrap(async (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -309,6 +346,8 @@ api.post("/auth/register", asyncWrap(async (req, res) => {
     );
     if (!role.rowCount) throw new Error("app_role is missing the buyer role");
     token = await createSession(userId, (text, params) => client.query(text, params));
+    // Same transaction as the account: the audit trail can never miss a registration.
+    await logAction(client, userId, "auth.register", "app_user", userId, req.ip, "self-service, role: buyer");
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
@@ -317,10 +356,10 @@ api.post("/auth/register", asyncWrap(async (req, res) => {
     client.release();
   }
   sendSessionCookie(res, token);
-  res.status(201).json({ user: await loadUser(userId) });
+  res.status(201).json({ user: await loadUser(userId), csrfToken: csrfTokenFor(token) });
 }));
 
-api.post("/auth/login", asyncWrap(async (req, res) => {
+api.post("/auth/login", loginLimit, asyncWrap(async (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
@@ -351,8 +390,8 @@ api.post("/auth/login", asyncWrap(async (req, res) => {
     return void fail(res, 401, "Email or password is incorrect.");
   }
   fails.delete(key);
-  await startSession(res, u.user_id);
-  res.json({ user: await loadUser(u.user_id) });
+  const sid = await startSession(res, u.user_id);
+  res.json({ user: await loadUser(u.user_id), csrfToken: csrfTokenFor(sid) });
 }));
 
 api.post("/auth/logout", asyncWrap(async (req, res) => {
@@ -361,6 +400,100 @@ api.post("/auth/logout", asyncWrap(async (req, res) => {
     await q(`UPDATE auth_session SET revoked_at = now() WHERE refresh_token_hash = $1 AND revoked_at IS NULL`,
       [hashToken(token)]);
   }
+  res.clearCookie("sid");
+  res.json({ ok: true });
+}));
+
+// ---------- password recovery ----------
+
+const RESET_MINUTES = 60;
+
+/**
+ * Looks the account up and emails a one-time link. Runs after the HTTP answer has been sent,
+ * so the response (and its timing) is the same whether or not the address is registered.
+ */
+async function sendResetEmail(email: string, ip: string | undefined): Promise<void> {
+  const { rows } = await q<{ user_id: string; name: string; email: string }>(
+    `SELECT user_id, name, email FROM app_user WHERE lower(email) = $1 AND account_status = 'active'`,
+    [email],
+  );
+  const u = rows[0];
+  if (!u) return;
+  // Only the hash is stored; the raw token exists in the email and nowhere else.
+  const token = crypto.randomBytes(32).toString("hex");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`UPDATE password_reset SET used_at = now() WHERE user_id = $1 AND used_at IS NULL`, [u.user_id]);
+    await client.query(
+      `INSERT INTO password_reset (user_id, token_hash, expires_at)
+       VALUES ($1, $2, now() + make_interval(mins => $3))`,
+      [u.user_id, hashToken(token), RESET_MINUTES],
+    );
+    await logAction(client, u.user_id, "auth.password_reset_requested", "app_user", u.user_id, ip, "self-service");
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  // The token rides in the URL fragment, which browsers never send to servers or proxies.
+  const base = env.appUrl || `http://localhost:${process.env.PORT ?? 3000}`;
+  await sendMail(passwordResetMail(u.email, u.name, `${base}/#/reset/${token}`, RESET_MINUTES));
+}
+
+api.post("/auth/forgot", forgotIpLimit, forgotMailLimit, asyncWrap(async (req, res) => {
+  const raw = (req.body as { email?: unknown } | undefined)?.email;
+  const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  // Same answer for known, unknown and malformed addresses: no account enumeration.
+  res.json({ ok: true });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return;
+  try {
+    await sendResetEmail(email, req.ip);
+  } catch (e) {
+    console.error("password reset email failed:", e instanceof Error ? e.message : e);
+  }
+}));
+
+api.post("/auth/reset", resetLimit, asyncWrap(async (req, res) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const token = typeof b.token === "string" ? b.token.trim() : "";
+  const password = typeof b.password === "string" ? b.password : "";
+  if (!/^[0-9a-f]{64}$/.test(token)) return void fail(res, 400, "This reset link is not valid. Ask for a new one.");
+  if (password.length < 8) return void fail(res, 400, "Use a password with at least 8 characters.");
+
+  const hash = await bcrypt.hash(password, 12);
+  const client = await pool.connect();
+  let email: string | null = null;
+  try {
+    await client.query("BEGIN");
+    // Single use: only the request that flips used_at from NULL succeeds.
+    const used = await client.query<{ user_id: string; email: string }>(
+      `UPDATE password_reset pr SET used_at = now()
+       FROM app_user u
+       WHERE pr.token_hash = $1 AND pr.used_at IS NULL AND pr.expires_at > now()
+         AND u.user_id = pr.user_id AND u.account_status = 'active'
+       RETURNING pr.user_id, u.email`,
+      [hashToken(token)],
+    );
+    const found = used.rows[0];
+    if (found) {
+      await client.query(`UPDATE app_user SET password_hash = $2 WHERE user_id = $1`, [found.user_id, hash]);
+      // Anyone holding the old password (or a stolen session) is signed out everywhere.
+      await client.query(`UPDATE auth_session SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [found.user_id]);
+      await logAction(client, found.user_id, "auth.password_reset", "app_user", found.user_id, req.ip, "self-service");
+      email = found.email;
+    }
+    await client.query(found ? "COMMIT" : "ROLLBACK");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  if (!email) return void fail(res, 410, "This reset link has expired or was already used. Ask for a new one.");
+  fails.delete(email.toLowerCase()); // a locked-out user can sign in straight away with the new password
   res.clearCookie("sid");
   res.json({ ok: true });
 }));
@@ -390,6 +523,7 @@ api.get("/bootstrap", asyncWrap(async (req, res) => {
   ]);
   res.json({
     user,
+    csrfToken: token ? csrfTokenFor(token) : null,
     currency: CURRENCY,
     payment: { provider: PAYMENT_PROVIDER, currency: CURRENCY, phoneRequired: PAYMENT_PROVIDER === "mpesa" },
     categories: data.categories,
@@ -492,7 +626,7 @@ interface CheckoutBody {
   methods?: Record<string, unknown>;
 }
 
-api.post("/checkout", asyncWrap(async (req, res, next) => {
+api.post("/checkout", checkoutLimit, asyncWrap(async (req, res, next) => {
   const user = await requireUser(req, res);
   if (!user) return;
   const body = req.body as CheckoutBody;
@@ -598,91 +732,138 @@ api.post("/checkout", asyncWrap(async (req, res, next) => {
   }
 }));
 
-/** Shape an order + its seller orders for the front end. */
-async function orderView(orderId: string): Promise<Record<string, unknown> | null> {
-  const { rows: o } = await q<{ order_id: string; order_status: string; currency: string;
-    total_amount_minor: string; ordered_at: Date;
-    delivery_name: string | null; delivery_phone: string | null; delivery_street: string | null;
-    delivery_city: string | null; delivery_zip: string | null }>(
-    `SELECT order_id, order_status, currency, total_amount_minor, ordered_at,
-            delivery_name, delivery_phone, delivery_street, delivery_city, delivery_zip
-     FROM market_order WHERE order_id = $1`, [orderId]);
-  if (!o.length) return null;
-  const head = o[0];
-  const { rows: sos } = await q<{
-    seller_order_id: string; seller_id: string; seller_name: string; method_name: string;
-    fulfillment_status: string; release_status: string; tracking_number: string | null;
-  }>(
-    `SELECT so.seller_order_id, so.seller_id, u.name AS seller_name, m.name AS method_name,
-            so.fulfillment_status, so.release_status, so.tracking_number
-     FROM seller_order so
-     JOIN app_user u ON u.user_id = so.seller_id
-     JOIN exchange_method m ON m.exchange_method_id = so.exchange_method_id
-     WHERE so.order_id = $1 ORDER BY so.seller_order_id`, [orderId]);
-  const soIds = sos.map(s => s.seller_order_id);
-  const items = soIds.length
-    ? (await q<{ seller_order_id: string; product_id: string; title: string; quantity: number;
-                 unit_price_minor: string; line_total_minor: string; order_item_id: string }>(
+/**
+ * Shapes orders and their seller orders for the front end. Loads any number of orders with a
+ * fixed set of queries (orders, seller orders, payments, then items and reviews), so a page
+ * of ten orders costs five round trips instead of five per order.
+ */
+async function orderViews(orderIds: string[]): Promise<Record<string, unknown>[]> {
+  if (!orderIds.length) return [];
+  const [heads, sos, pays] = await Promise.all([
+    q<{ order_id: string; order_status: string; currency: string;
+      total_amount_minor: string; ordered_at: Date;
+      delivery_name: string | null; delivery_phone: string | null; delivery_street: string | null;
+      delivery_city: string | null; delivery_zip: string | null }>(
+      `SELECT order_id, order_status, currency, total_amount_minor, ordered_at,
+              delivery_name, delivery_phone, delivery_street, delivery_city, delivery_zip
+       FROM market_order WHERE order_id = ANY($1::bigint[])`, [orderIds]),
+    q<{ order_id: string; seller_order_id: string; seller_id: string; seller_name: string; method_name: string;
+      fulfillment_status: string; release_status: string; tracking_number: string | null }>(
+      `SELECT so.order_id, so.seller_order_id, so.seller_id, u.name AS seller_name, m.name AS method_name,
+              so.fulfillment_status, so.release_status, so.tracking_number
+       FROM seller_order so
+       JOIN app_user u ON u.user_id = so.seller_id
+       JOIN exchange_method m ON m.exchange_method_id = so.exchange_method_id
+       WHERE so.order_id = ANY($1::bigint[]) ORDER BY so.seller_order_id`, [orderIds]),
+    // Payment state comes from the payment rows, never from the order status: checkouts that
+    // were confirmed before a provider existed have no payment, and calling those "captured" lies.
+    q<{ order_id: string; status: string; provider_receipt: string | null; amount_minor: string }>(
+      `SELECT order_id, status, provider_receipt, amount_minor FROM payment
+       WHERE order_id = ANY($1::bigint[]) ORDER BY created_at DESC, payment_id DESC`, [orderIds]),
+  ]);
+
+  type ItemRow = { seller_order_id: string; product_id: string; title: string; quantity: number;
+    unit_price_minor: string; line_total_minor: string; order_item_id: string };
+  const soIds = sos.rows.map((s) => s.seller_order_id);
+  let itemRows: ItemRow[] = [];
+  const reviewed = new Set<string>();
+  if (soIds.length) {
+    const [items, reviews] = await Promise.all([
+      q<ItemRow>(
         `SELECT soi.seller_order_id, oi.product_id, oi.product_title_snapshot AS title, oi.quantity,
                 oi.unit_price_minor, oi.line_total_minor, oi.order_item_id
          FROM seller_order_item soi JOIN order_item oi USING(order_item_id)
-         WHERE soi.seller_order_id = ANY($1)`, [soIds])).rows
-    : [];
-  const reviews = soIds.length
-    ? (await q<{ seller_order_id: string }>(`SELECT seller_order_id FROM review WHERE seller_order_id = ANY($1)`,
-        [soIds])).rows
-    : [];
-  const reviewed = new Set(reviews.map(r => r.seller_order_id));
-  const sellerOrders = sos.map(s => ({
-    id: s.seller_order_id,
-    sellerId: s.seller_id,
-    sellerName: s.seller_name,
-    method: s.method_name,
-    fulfillment: s.fulfillment_status,
-    release: s.release_status,
-    tracking: s.tracking_number ?? "",
-    reviewed: reviewed.has(s.seller_order_id),
-    items: (items || []).filter(i => i.seller_order_id === s.seller_order_id).map(i => ({
-      productId: i.product_id, title: i.title, qty: i.quantity,
-      unitMinor: Number(i.unit_price_minor), lineMinor: Number(i.line_total_minor),
-    })),
-  }));
-  // Payment state comes from the payment rows, never from the order status: checkouts that
-  // were confirmed before a provider existed have no payment, and calling those "captured" lies.
-  const { rows: pays } = await q<{ status: string; provider_receipt: string | null; amount_minor: string }>(
-    `SELECT status, provider_receipt, amount_minor FROM payment
-     WHERE order_id = $1 ORDER BY created_at DESC, payment_id DESC`, [orderId]);
-  const settled = pays.find(p => ["captured", "partially_refunded", "refunded"].includes(p.status));
-  const waiting = pays.find(p => p.status === "created" || p.status === "requires_action");
-  const payment = settled ? settled.status : waiting ? "pending" : "none";
-  return {
-    id: head.order_id,
-    status: head.order_status,
-    payment,
-    paidMinor: settled ? Number(settled.amount_minor) : 0,
-    receipt: settled?.provider_receipt ?? null,
-    currency: head.currency,
-    totalMinor: Number(head.total_amount_minor),
-    orderedAt: head.ordered_at,
-    delivery: {
-      name: head.delivery_name ?? "",
-      phone: head.delivery_phone ?? "",
-      street: head.delivery_street ?? "",
-      city: head.delivery_city ?? "",
-      zip: head.delivery_zip ?? "",
-    },
-    sellerOrders,
+         WHERE soi.seller_order_id = ANY($1::bigint[])`, [soIds]),
+      q<{ seller_order_id: string }>(
+        `SELECT seller_order_id FROM review WHERE seller_order_id = ANY($1::bigint[])`, [soIds]),
+    ]);
+    itemRows = items.rows;
+    for (const r of reviews.rows) reviewed.add(r.seller_order_id);
+  }
+
+  const group = <T,>(rows: T[], keyOf: (r: T) => string): Map<string, T[]> => {
+    const m = new Map<string, T[]>();
+    for (const r of rows) {
+      const k = keyOf(r);
+      const list = m.get(k);
+      if (list) list.push(r);
+      else m.set(k, [r]);
+    }
+    return m;
   };
+  const itemsBySo = group(itemRows, (i) => String(i.seller_order_id));
+  const sosByOrder = group(sos.rows, (s) => String(s.order_id));
+  const paysByOrder = group(pays.rows, (p) => String(p.order_id));
+  const headById = new Map(heads.rows.map((h) => [String(h.order_id), h] as const));
+
+  const views: Record<string, unknown>[] = [];
+  for (const id of orderIds) {
+    const head = headById.get(String(id));
+    if (!head) continue;
+    const sellerOrders = (sosByOrder.get(String(id)) ?? []).map((s) => ({
+      id: s.seller_order_id,
+      sellerId: s.seller_id,
+      sellerName: s.seller_name,
+      method: s.method_name,
+      fulfillment: s.fulfillment_status,
+      release: s.release_status,
+      tracking: s.tracking_number ?? "",
+      reviewed: reviewed.has(s.seller_order_id),
+      items: (itemsBySo.get(String(s.seller_order_id)) ?? []).map((i) => ({
+        productId: i.product_id, title: i.title, qty: i.quantity,
+        unitMinor: Number(i.unit_price_minor), lineMinor: Number(i.line_total_minor),
+      })),
+    }));
+    const orderPays = paysByOrder.get(String(id)) ?? [];
+    const settled = orderPays.find((p) => ["captured", "partially_refunded", "refunded"].includes(p.status));
+    const waiting = orderPays.find((p) => p.status === "created" || p.status === "requires_action");
+    views.push({
+      id: head.order_id,
+      status: head.order_status,
+      payment: settled ? settled.status : waiting ? "pending" : "none",
+      paidMinor: settled ? Number(settled.amount_minor) : 0,
+      receipt: settled?.provider_receipt ?? null,
+      currency: head.currency,
+      totalMinor: Number(head.total_amount_minor),
+      orderedAt: head.ordered_at,
+      delivery: {
+        name: head.delivery_name ?? "",
+        phone: head.delivery_phone ?? "",
+        street: head.delivery_street ?? "",
+        city: head.delivery_city ?? "",
+        zip: head.delivery_zip ?? "",
+      },
+      sellerOrders,
+    });
+  }
+  return views;
 }
 
+async function orderView(orderId: string): Promise<Record<string, unknown> | null> {
+  return (await orderViews([orderId]))[0] ?? null;
+}
+
+/** The buyer's orders, newest first, one page at a time: ?page=1&pageSize=10 (pageSize max 50). */
 api.get("/orders", asyncWrap(async (req, res) => {
   const user = await requireUser(req, res);
   if (!user) return;
+  const asInt = (v: unknown, fallback: number): number => {
+    const n = Math.floor(Number(typeof v === "string" ? v : NaN));
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  };
+  const pageSize = Math.min(asInt(req.query.pageSize, 10), 50);
+  const total = Number(
+    (await q<{ n: string }>(`SELECT count(*)::text AS n FROM market_order WHERE buyer_id = $1`, [user.user_id]))
+      .rows[0]?.n ?? 0,
+  );
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(asInt(req.query.page, 1), pages);
   const { rows } = await q<{ order_id: string }>(
     `SELECT order_id FROM market_order
-     WHERE buyer_id = $1 ORDER BY order_id DESC`, [user.user_id]);
-  const orders = (await Promise.all(rows.map(r => orderView(r.order_id)))).filter(Boolean);
-  res.json({ orders });
+     WHERE buyer_id = $1 ORDER BY order_id DESC LIMIT $2 OFFSET $3`,
+    [user.user_id, pageSize, (page - 1) * pageSize]);
+  const orders = await orderViews(rows.map((r) => r.order_id));
+  res.json({ orders, page, pageSize, total, pages });
 }));
 
 api.get("/order/:id", asyncWrap(async (req, res) => {
@@ -983,7 +1164,7 @@ export async function expireStaleOrders(): Promise<void> {
 }
 
 /** Payment entry point: the configured provider decides what happens next. */
-api.post("/order/:id/pay", asyncWrap(async (req, res) => {
+api.post("/order/:id/pay", payLimit, asyncWrap(async (req, res) => {
   const id = await assertBuyerOrder(req, res);
   if (!id) return;
   if (PAYMENT_PROVIDER === "mpesa") return void await startMpesaPayment(req, res, id);

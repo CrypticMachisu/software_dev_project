@@ -4,6 +4,19 @@ Twelve minutes: about seven minutes of talking, five of live demo. The demo uses
 accounts and a fresh browser window; the admin panel is shown in a second tab so the audience can
 watch one order move from storefront to payout.
 
+## Rehearsal (do this twice, the day before and an hour before)
+
+1. `npm run smoke` against the live URL (see INSTALL.md, "Going live and checking it"). Everything
+   must pass; the M-Pesa line may say SKIP in demo mode.
+2. `ADMIN_EMAIL=... ADMIN_PASSWORD=... npm run verify:registration` — shows, with database rows,
+   that a self-registered user and a super-admin-created user are both saved.
+3. Walk the demo below with a stopwatch, in a clean browser profile, using only the seeded accounts:
+   `jane@example.com` (buyer), `sam@example.com` (seller) and your admin. If you seeded a demo
+   super admin, it is `superadmin@example.com` with the password you set.
+4. Rehearse the **forgot password** moment: request a reset for your own address, open the email
+   link, set a new password, sign in. Have the old tab closed so you show the session revoking.
+5. Keep a backup: screenshots of each step, and the admin reset link route, in case email is slow.
+
 ## Before you go on stage
 
 - `npm run build`, then start the app; run `npm run demo:seed` if the database is empty.
@@ -37,8 +50,10 @@ show the seller dashboard's revenue and best sellers.
 
 ## Slide 5 — Admin panel (full size) (90s)
 
-Dashboard: revenue trend, pipeline, low stock. Then user management: suspend a user and note the
-session dies immediately; issue a password reset link and explain it is single-use.
+Dashboard: revenue trend, pipeline, low stock. Then user management: **create a user as super
+admin and show the same person in the database-backed list straight away**, with the audit-log line
+naming you. Suspend a user and note the session dies immediately; issue a password reset link and
+explain it is single-use. Register a new buyer on the storefront and show them appear in *Users*.
 
 ## Slide 6 — Money: refunds and payouts (90s, demo)
 
@@ -56,8 +71,10 @@ Point out the company header, period, generation time and the 500-row cap.
 
 Hashing with bcrypt, parameterised SQL everywhere, role checks on every admin route, sessions
 revoked on suspension and password reset, audit log for privileged changes, and optional TOTP
-two-factor on the admin login. Mention the known limits honestly: no CSRF tokens, in-memory login
-lockout, no email delivery.
+two-factor on the admin login. Then the newer layers: CSRF tokens on every state-changing call,
+rate limits on sign-up, sign-in, password recovery, checkout and payment, a public `/health` that
+only says `ok`, and self-service password reset by emailed one-time link. Mention the known limits
+honestly: lockouts and rate limits live in memory (one instance), and email is used for resets only.
 
 ## Slide 9 — Testing and documentation (60s)
 
@@ -68,8 +85,9 @@ refunds; `scripts/check-contrast.mjs` checks the palette. Documentation: `README
 
 ## Slide 10 — What I would do next (45s)
 
-Email delivery for resets and notifications, CSRF tokens, pagination and query batching for
-`/api/orders`, and a provider-backed payout API instead of a recorded reference.
+Order notifications by email, a shared store (Redis) for rate limits and lockouts when running more
+than one instance, server-side filtering in the storefront (the API already supports it), and a
+provider-backed payout API instead of a recorded reference.
 
 ## Likely questions
 

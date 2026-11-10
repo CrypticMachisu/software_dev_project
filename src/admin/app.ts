@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import helmet from "helmet";
 import { env } from "../env.js";
+import { injectFormTokens } from "../csrf.js";
 import "./types.js";
 import { requireAdmin, requireRole } from "./auth.js";
 import { auditRouter } from "./routes/audit.js";
@@ -48,6 +49,7 @@ adminApp.use(
 );
 adminApp.use(express.urlencoded({ extended: false }));
 adminApp.use(cookieParser());
+adminApp.use(injectFormTokens); // hidden _csrf field in every POST form once a session cookie exists
 adminApp.use("/admin/static", express.static(path.resolve(process.cwd(), "src", "admin", "public")));
 
 // Display helpers available in every view

@@ -24,5 +24,8 @@ COPY src/public ./src/public
 COPY SQL ./SQL
 USER node
 EXPOSE 3000
+# /health answers {"ok":true} only when the database is reachable.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 # DATABASE_URL (and any payment settings) come from the environment, not a baked .env.
 CMD ["node", "dist/src/server.js"]

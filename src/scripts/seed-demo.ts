@@ -67,6 +67,15 @@ async function main(): Promise<void> {
   const categoryIds = new Map<string, number>();
   for (const c of CATEGORIES) categoryIds.set(c.name, await ensureCategory(c));
 
+  // Optional demo super admin. The password comes from the environment so a known default
+  // never ships to a live site: DEMO_ADMIN_PASSWORD='something-long' npm run demo:seed
+  const adminPassword = process.env.DEMO_ADMIN_PASSWORD ?? "";
+  if (adminPassword) {
+    if (adminPassword.length < 10) throw new Error("DEMO_ADMIN_PASSWORD must be at least 10 characters.");
+    await ensureUser("Demo Super Admin", "superadmin@example.com", adminPassword, ["admin", "super_admin"]);
+    console.log("Demo super admin ready: superadmin@example.com");
+  }
+
   // A managed exchange method needs an admin as owner; reuse the seeded admin or jane.
   await withTransaction(async (trx) => {
     const { rows: admins } = await trx.query<{ user_id: string }>(

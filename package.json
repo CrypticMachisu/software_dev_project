@@ -8,7 +8,10 @@
     "start": "node --env-file=.env dist/src/server.js",
     "dev": "tsc && node --env-file=.env dist/src/server.js",
     "admin:seed": "node --env-file=.env dist/src/scripts/seed-admin.js",
-    "demo:seed": "node --env-file=.env dist/src/scripts/seed-demo.js"
+    "demo:seed": "node --env-file=.env dist/src/scripts/seed-demo.js",
+    "verify:registration": "node --env-file=.env scripts/verify-registration.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "stress": "node scripts/stress-test.mjs"
   },
   "dependencies": {
     "@neon/config": "^1.9.3",

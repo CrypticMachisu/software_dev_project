@@ -328,8 +328,19 @@ function clearFieldError(input){
 }
 
 /* ===== API client (talks to /api on the server: Postgres-backed) ===== */
-async function api(path,opts){const r=await fetch("/api"+path,{credentials:"same-origin",...opts});
- const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Network error");return d}
+let csrf=null; // sent as x-csrf-token on every state-changing call; the server hands it out with the session
+async function api(path,opts={},retry=true){
+ const method=(opts.method||"GET").toUpperCase();
+ const headers={...(opts.headers||{})};
+ if(csrf&&method!=="GET")headers["x-csrf-token"]=csrf;
+ const r=await fetch("/api"+path,{credentials:"same-origin",...opts,headers});
+ const d=await r.json().catch(()=>({}));
+ if(r.status===403&&d.code==="csrf"&&retry){ // signed in or out in another tab: fetch the current token once and retry
+  const m=await fetch("/api/me",{credentials:"same-origin"}).then(x=>x.json()).catch(()=>({}));
+  csrf=m.csrfToken??null;return api(path,opts,false)}
+ if(!r.ok)throw new Error(d.error||"Network error");
+ if("csrfToken" in d)csrf=d.csrfToken||null;
+ return d}
 const call=(method,path,data)=>api(path,data===undefined?{method}:{method,headers:{"content-type":"application/json"},body:JSON.stringify(data)});
 
 /* ===== App state (boots from /api/bootstrap, a Postgres snapshot) ===== */
@@ -392,7 +403,17 @@ V.login=(a,q)=>`<div class="card" style="max-width:400px;margin:2rem auto"><h1>W
  <form data-form="auth" data-next="${esc(q.next||"#/")}" style="margin-top:.6rem">${a.mode=="reg"?'<label>Name</label><input name="name" required maxlength="150">':""}
  <label>Email</label><input name="email" type="email" required placeholder="jane@example.com"><label>Password</label><input name="pw" type="password" required minlength="8" placeholder="password123">
  <div class="err" id="err"></div><button style="width:100%">${a.mode=="reg"?"Create account":"Log in"}</button></form>
+ ${a.mode=="reg"?"":'<p style="margin:.6rem 0 0"><a href="#/forgot">Forgot your password?</a></p>'}
  <p class="mute">Demo accounts: jane@example.com (buyer) · sam@example.com (seller), password123.</p></div>`;
+V.forgot=()=>`<div class="card" style="max-width:400px;margin:2rem auto"><h1>Reset your password</h1>
+ <p class="mute">Enter the email you registered with. If it matches an account, we send a link that works once for 60 minutes.</p>
+ <form data-form="forgot"><label>Email</label><input name="email" type="email" required autocomplete="email">
+ <div class="err" id="err"></div><button style="width:100%">Email me a reset link</button></form>
+ <p style="margin:.8rem 0 0"><a href="#/login">Back to log in</a></p></div>`;
+V.reset=(args)=>`<div class="card" style="max-width:400px;margin:2rem auto"><h1>Choose a new password</h1>
+ <form data-form="reset" data-token="${esc(args[0]||"")}"><label>New password</label><input name="pw" type="password" required minlength="8" autocomplete="new-password">
+ <label>Repeat it</label><input name="pw2" type="password" required minlength="8" autocomplete="new-password">
+ <div class="err" id="err"></div><button style="width:100%">Save password</button></form></div>`;
 let browsePainted=false;
 V.browse=()=>{
  const f=catalog,base=db.products;
@@ -476,10 +497,11 @@ const stepper=s=>{const i=STEPS.indexOf(s.fulfillment);
  if(i<0)return `<span class="chip bad">${LABEL[s.fulfillment]??s.fulfillment}</span>`;
  return `<ol class="order-steps" aria-label="Order progress">${STEPS.map((x,k)=>`<li class="${k<=i?"done":""}"${k===i?' aria-current="step"':""}>${LABEL[x]}</li>`).join("")}</ol>`;
 };
-V.orders=async()=>{const os=(await api("/orders")).orders;
+V.orders=async(a,q)=>{const page=Math.max(1,+q.page||1),r=await api("/orders?page="+page),os=r.orders;
+ const pager=r.pages>1?`<nav class="row" style="justify-content:center;gap:.8rem;margin:1rem 0" aria-label="Order pages">${r.page>1?`<a class="btn ghost" href="#/orders?page=${r.page-1}">Newer</a>`:""}<span class="mute">Page ${r.page} of ${r.pages} · ${r.total} orders</span>${r.page<r.pages?`<a class="btn ghost" href="#/orders?page=${r.page+1}">Older</a>`:""}</nav>`:"";
  if(!os.length)return'<div class="card"><h1>No orders yet</h1><a href="#/">Browse products</a></div>';
  return `<h1>My orders</h1>${os.map(o=>`<div class="card" style="margin-bottom:1rem"><div class="row"><strong>Order #${o.id} · ${new Date(o.orderedAt).toLocaleDateString()}</strong><span class="sp"></span><strong>${money(o.totalMinor,o.currency)}</strong></div>${o.delivery?.street?`<div class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</div>`:""}${o.status=="pending"?`<div class="row" style="padding:.55rem 0;border-top:1px solid var(--line)"><span class="chip warn">Awaiting payment</span><span class="sp"></span><a class="btn ghost" href="#/pay/${o.id}">Pay now</a><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel</button></div>`:o.status=="cancelled"?'<span class="chip bad">Payment failed</span>':o.sellerOrders.map(s=>`<div class="row" style="padding:.5rem 0;border-top:1px solid var(--line)"><span style="min-width:140px">${esc(s.sellerName)} · ${s.items.length} item(s)${s.tracking?`<br><span class="mute">Tracking: ${esc(s.tracking)}</span>`:""}</span>${stepper(s)}<span class="sp"></span>
- ${s.fulfillment=="shipped"?`<button class="sm" data-act="receive" data-id="${s.id}">Confirm receipt</button>`:""}${s.fulfillment=="completed"?(s.reviewed?'<span class="chip ok">Reviewed</span>':`<button class="sm" data-act="review" data-id="${s.id}">Leave review</button>`)+(s.release!="not_eligible"?'<span class="chip warn">Refund requested</span>':`<button class="sm ghost" data-act="refund" data-id="${s.id}">Request refund</button>`):""}</div>`).join("")}</div>`).join("")}`};
+ ${s.fulfillment=="shipped"?`<button class="sm" data-act="receive" data-id="${s.id}">Confirm receipt</button>`:""}${s.fulfillment=="completed"?(s.reviewed?'<span class="chip ok">Reviewed</span>':`<button class="sm" data-act="review" data-id="${s.id}">Leave review</button>`)+(s.release!="not_eligible"?'<span class="chip warn">Refund requested</span>':`<button class="sm ghost" data-act="refund" data-id="${s.id}">Request refund</button>`):""}</div>`).join("")}</div>`).join("")}${pager}`};
 V.seller=async()=>{const u=auth.user;if(!u)return "<p>Sign in first.</p>";
  if(!auth.hasRole("seller"))return `<div class="card"><h1>Become a seller</h1><p>List items in a few clicks; orders arrive here as soon as buyers check out.</p><button data-act="beseller">Start selling</button></div>`;
  const [L,S,ST]=await Promise.all([api("/seller/listings"),api("/seller/orders"),api("/seller/stats")]);
@@ -603,6 +625,13 @@ document.addEventListener("submit",ev=>{const f=ev.target,k=f.dataset.form;if(!k
  const d=Object.fromEntries(new FormData(f));const errs=f.querySelectorAll(".err"),err=errs[errs.length-1]||document.getElementById("err");
  (async()=>{
   if(k=="auth"){state.mode=="reg"?await auth.register(d.name,d.email,d.pw):await auth.login(d.email,d.pw);navbar();location.hash=decodeURIComponent(f.dataset.next)}
+  else if(k=="forgot"){await call("POST","/auth/forgot",{email:d.email});
+   f.innerHTML='<p class="ok" role="status">If that email is registered, a reset link is on its way. It works once and expires in 60 minutes. Check your spam folder too.</p>'}
+  else if(k=="reset"){
+   if(d.pw!==d.pw2){if(err)err.textContent="The two passwords do not match.";return}
+   await call("POST","/auth/reset",{token:f.dataset.token,password:d.pw});
+   db.user=null;csrf=null;navbar();
+   f.outerHTML='<p class="ok" role="status">Password updated. You were signed out everywhere.</p><a class="btn" href="#/login">Log in</a>'}
   else if(k=="checkout"){
    const required=[...f.querySelectorAll("[required]")];
    const missing=required.find(el=>!el.value.trim());
