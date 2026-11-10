@@ -21,6 +21,8 @@ export const env = {
       shortcode: (process.env.MPESA_SHORTCODE ?? "174379").trim(),
       passkey: (process.env.MPESA_PASSKEY ?? "").trim(),
       callbackUrl: (process.env.MPESA_CALLBACK_URL ?? "").trim(),
+      /** Optional shared secret appended to the callback path; Daraja cannot sign callbacks. */
+      callbackSecret: (process.env.MPESA_CALLBACK_SECRET ?? "").trim(),
     },
   },
 };

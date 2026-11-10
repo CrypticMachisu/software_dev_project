@@ -56,17 +56,6 @@ dashboardRouter.get("/", async (_req, res, next) => {
       )
     ).rows[0];
 
-    const pending = (
-      await query(
-        `SELECT u.user_id, u.name, u.email, ur.assigned_at
-         FROM user_role ur
-         JOIN app_role r ON r.role_id = ur.role_id
-         JOIN app_user u ON u.user_id = ur.user_id
-         WHERE r.role_name = 'seller' AND ur.approval_status = 'pending'
-         ORDER BY ur.assigned_at LIMIT 5`,
-      )
-    ).rows;
-
     const recent = (
       await query(
         `SELECT so.seller_order_id, mo.order_id, bu.name AS buyer, mo.total_amount_minor,
@@ -94,7 +83,6 @@ dashboardRouter.get("/", async (_req, res, next) => {
       revenueByCurrency,
       daily,
       pipeline,
-      pending,
       recent,
       lowStock,
     });

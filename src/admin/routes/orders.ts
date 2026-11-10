@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { Router } from "express";
 import { query, withTransaction } from "../db-helpers.js";
 import { audit, dateOf, flash, flashLocals, idOf, likeOf, pagerOf, route, str } from "../util.js";
@@ -110,7 +111,10 @@ ordersRouter.get(
     const sellerOrders = (
       await query<Record<string, unknown> & { seller_order_id: string; fulfillment_status: string }>(
         `SELECT so.seller_order_id, so.fulfillment_status, so.release_status, so.updated_at,
-                su.name AS seller, em.name AS exchange_method
+                su.name AS seller, em.name AS exchange_method,
+                EXISTS (SELECT 1 FROM payment_allocation pa JOIN payment p USING(payment_id)
+                        WHERE pa.seller_order_id = so.seller_order_id AND pa.status <> 'reversed'
+                          AND p.status IN ('captured','partially_refunded')) AS refundable
          FROM seller_order so
          JOIN app_user su ON su.user_id = so.seller_id
          JOIN exchange_method em ON em.exchange_method_id = so.exchange_method_id
@@ -200,5 +204,112 @@ ordersRouter.post(
     const back = `/admin/orders/${outcome.orderId}`;
     if (outcome.kind === "bad") return flash(res, back, "err", `A ${outcome.from} order cannot be changed to "${next || "that"}".`);
     flash(res, back, "msg", `Order moved to ${next}.`);
+  }),
+);
+
+/* ---------- Record a refund for one seller order ---------- */
+
+/**
+ * The money itself is reversed by a human (Daraja has no refund API call in this app), so this
+ * records the refund, reverses the seller's allocation and keeps the payment and checkout
+ * statuses truthful instead of claiming a transfer that never happened.
+ */
+ordersRouter.post(
+  "/seller-orders/:soid/refund",
+  route(async (req, res) => {
+    const soid = idOf(req.params.soid);
+    if (!soid) return flash(res, "/admin/orders", "err", "Order not found.");
+    const reason = str((req.body as Record<string, unknown>).reason, 300) || "Refund recorded by an admin";
+
+    const outcome = await withTransaction(async (c) => {
+      const so = (
+        await c.query<{ order_id: string }>(
+          `SELECT order_id FROM seller_order WHERE seller_order_id = $1 FOR UPDATE`,
+          [soid],
+        )
+      ).rows[0];
+      if (!so) return { kind: "missing" as const };
+
+      const alloc = (
+        await c.query<{
+          allocation_id: string; payment_id: string; amount_minor: string; currency: string;
+          payment_provider_id: string; payment_amount: string;
+        }>(
+          `SELECT pa.allocation_id, pa.payment_id, pa.amount_minor, pa.currency,
+                  p.payment_provider_id, p.amount_minor AS payment_amount
+           FROM payment_allocation pa
+           JOIN payment p USING(payment_id)
+           WHERE pa.seller_order_id = $1 AND pa.allocation_type = 'seller_proceeds'
+             AND pa.status <> 'reversed' AND p.status IN ('captured','partially_refunded')
+           ORDER BY pa.allocation_id DESC LIMIT 1`,
+          [soid],
+        )
+      ).rows[0];
+      if (!alloc) return { kind: "nopayment" as const, orderId: so.order_id };
+
+      const existing = (
+        await c.query(
+          `SELECT 1 FROM refund WHERE seller_order_id = $1 AND status IN ('requested','pending','succeeded')`,
+          [soid],
+        )
+      ).rows;
+      if (existing.length) return { kind: "duplicate" as const, orderId: so.order_id };
+
+      await c.query(
+        `INSERT INTO refund (payment_id, seller_order_id, payment_provider_id, amount_minor, currency,
+                             status, reason, idempotency_key)
+         VALUES ($1, $2, $3, $4, $5, 'requested', $6, $7)`,
+        [alloc.payment_id, soid, alloc.payment_provider_id, alloc.amount_minor, alloc.currency, reason,
+          `refund:${soid}:${crypto.randomUUID()}`],
+      );
+      await c.query(`UPDATE payment_allocation SET status = 'reversed' WHERE allocation_id = $1`, [alloc.allocation_id]);
+      // A shipped or delivered order becomes a return; anything earlier is simply cancelled.
+      await c.query(
+        `UPDATE seller_order
+            SET fulfillment_status = CASE WHEN fulfillment_status IN ('shipped','delivered','completed')
+                                          THEN 'returned' ELSE 'cancelled' END,
+                release_status = 'reversed', updated_at = now()
+          WHERE seller_order_id = $1`,
+        [soid],
+      );
+
+      const refunded = (
+        await c.query<{ total: string }>(
+          `SELECT coalesce(sum(amount_minor),0)::text AS total FROM refund
+           WHERE payment_id = $1 AND status IN ('requested','pending','succeeded')`,
+          [alloc.payment_id],
+        )
+      ).rows[0];
+      const paymentStatus = Number(refunded.total) >= Number(alloc.payment_amount) ? "refunded" : "partially_refunded";
+      await c.query(`UPDATE payment SET status = $2, updated_at = now() WHERE payment_id = $1`,
+        [alloc.payment_id, paymentStatus]);
+
+      const left = (
+        await c.query<{ n: string }>(
+          `SELECT count(*)::text AS n FROM seller_order
+           WHERE order_id = $1 AND fulfillment_status NOT IN ('cancelled','returned')`,
+          [so.order_id],
+        )
+      ).rows[0];
+      const orderStatus = Number(left.n) === 0 ? "refunded" : "partially_refunded";
+      await c.query(
+        `UPDATE market_order SET order_status = $2 WHERE order_id = $1 AND order_status <> 'cancelled'`,
+        [so.order_id, orderStatus],
+      );
+
+      await audit(c, req, "order.refund_recorded", "seller_order", soid,
+        `Order #${so.order_id}: ${alloc.amount_minor} ${alloc.currency} refunded (${paymentStatus}). ${reason}`);
+      return { kind: "ok" as const, orderId: so.order_id, paymentStatus };
+    });
+
+    if (outcome.kind === "missing") return flash(res, "/admin/orders", "err", "Order not found.");
+    if (outcome.kind === "nopayment") {
+      return flash(res, `/admin/orders/${outcome.orderId}`, "err", "This seller order has no captured payment to refund.");
+    }
+    if (outcome.kind === "duplicate") {
+      return flash(res, `/admin/orders/${outcome.orderId}`, "err", "A refund is already recorded for this seller order.");
+    }
+    flash(res, `/admin/orders/${outcome.orderId}`, "msg",
+      `Refund recorded (${outcome.paymentStatus}). Reverse the money in the provider dashboard.`);
   }),
 );

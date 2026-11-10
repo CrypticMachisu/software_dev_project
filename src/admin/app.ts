@@ -20,6 +20,11 @@ import { usersRouter } from "./routes/users.js";
  */
 export const adminApp = express();
 
+// Behind ngrok or another proxy, req.ip and audit_log.ip_address need one forwarded hop.
+if (process.env.TRUST_PROXY === "true" || process.env.NODE_ENV === "production") {
+  adminApp.set("trust proxy", 1);
+}
+
 adminApp.set("view engine", "ejs");
 adminApp.set("views", path.resolve(process.cwd(), "src", "admin", "views"));
 

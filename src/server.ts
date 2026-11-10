@@ -86,6 +86,19 @@ const server = http.createServer(async (req, res) => {
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 
+// Expired sessions are dead weight; clear them on boot so auth_session cannot grow forever.
+void pool
+  .query(`DELETE FROM auth_session
+          WHERE expires_at < now() - interval '1 day' OR revoked_at < now() - interval '1 day'`)
+  .catch((err: unknown) => console.error("session cleanup failed", err));
+
+if (process.env.NODE_ENV !== "production") {
+  console.warn(
+    "NODE_ENV is not production, so the session cookie is sent without Secure. " +
+      "Set NODE_ENV=production when the app is served over HTTPS.",
+  );
+}
+
 server.listen(port, () => {
   console.log(`listening on http://127.0.0.1:${port}`);
 });

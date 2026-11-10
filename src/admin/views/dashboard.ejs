@@ -35,16 +35,7 @@
 </div>
 
 <div class="row g-3">
-  <div class="col-lg-6"><div class="card h-100"><div class="card-body">
-    <h2 class="h6">Pending seller approvals</h2>
-    <% if (!pending.length) { %><p class="text-muted mb-0">No sellers waiting for approval.</p><% } else { %>
-    <div class="table-responsive"><table class="table table-sm align-middle mb-0">
-      <thead><tr><th>Seller</th><th>Email</th><th>Since</th></tr></thead>
-      <tbody><% pending.forEach(p => { %><tr><td><a href="/admin/users/<%= p.user_id %>"><%= p.name %></a></td><td><%= p.email %></td><td><%= fmtDate(p.assigned_at) %></td></tr><% }) %></tbody>
-    </table></div><% } %>
-  </div></div></div>
-
-  <div class="col-lg-6"><div class="card h-100"><div class="card-body">
+  <div class="col-12"><div class="card h-100"><div class="card-body">
     <h2 class="h6">Recent orders</h2>
     <% if (!recent.length) { %><p class="text-muted mb-0">No orders yet.</p><% } else { %>
     <div class="table-responsive"><table class="table table-sm align-middle mb-0">

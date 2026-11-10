@@ -65,11 +65,17 @@ registration, no paybill. That is only required for Go Live (real money).
        MPESA_PASSKEY=...
        MPESA_CALLBACK_URL=https://<your-ngrok-id>.ngrok-free.app/api/webhooks/mpesa
        # MPESA_ENV=sandbox   (default; use production only with a paybill)
+       # MPESA_CALLBACK_SECRET=some-long-random-string
 
 Charge flow: the buyer enters their number on `#/pay/:id`, Safaricom sends the STK prompt,
 `POST /api/webhooks/mpesa` settles the order (stock, `payment`, `payment_allocation`,
 `provider_event`) and the result page polls until it flips to confirmed. Sandbox test
 amounts are reversed by Safaricom, usually the next morning.
+
+Set `MPESA_CALLBACK_SECRET` and append it to the URL you register with Daraja
+(`.../api/webhooks/mpesa/<secret>`). Daraja cannot sign callbacks, so that shared secret is what
+stops anyone who learns a checkout id from confirming an unpaid order. Set
+`NODE_ENV=production` when you serve over HTTPS so the session cookie is marked Secure.
 
 Switching `PAYMENT_PROVIDER` back to `demo` restores the simulated checkout, so a demo
 never depends on the sandbox.

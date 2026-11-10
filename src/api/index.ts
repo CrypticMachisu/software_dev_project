@@ -18,6 +18,9 @@ export const api = express();
 
 api.use(cookieParser());
 api.use(express.json({ limit: "100kb" }));
+// Behind ngrok or any reverse proxy the client address arrives in X-Forwarded-For;
+// without this every audit and login attempt records the proxy's IP instead.
+if (process.env.TRUST_PROXY === "true" || process.env.NODE_ENV === "production") api.set("trust proxy", 1);
 
 // ---------- helpers ----------
 
@@ -54,26 +57,38 @@ async function requireUser(req: Request, res: Response): Promise<ApiUser | null>
     fail(res, 401, "Sign in to continue.");
     return null;
   }
+  const hash = hashToken(token);
   const { rows } = await q<{
     user_id: string;
     name: string;
     email: string;
-    roles: string[];
+    roles: string[] | null;
+    expires_at: Date;
   }>(
-    `UPDATE auth_session s SET expires_at = now() + make_interval(mins => $2)
-     FROM app_user u
-     WHERE s.refresh_token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
-       AND u.user_id = s.user_id AND u.account_status = 'active'
-     RETURNING u.user_id, u.name, u.email,
+    `SELECT u.user_id, u.name, u.email, s.expires_at,
        (SELECT array_agg(r.role_name) FROM user_role ur
           JOIN app_role r ON r.role_id = ur.role_id
-         WHERE ur.user_id = u.user_id AND ur.approval_status = 'approved') AS roles`,
-    [hashToken(token), IDLE_MINUTES],
+         WHERE ur.user_id = u.user_id AND ur.approval_status = 'approved') AS roles
+     FROM auth_session s
+     JOIN app_user u ON u.user_id = s.user_id
+     WHERE s.refresh_token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
+       AND u.account_status = 'active'
+     LIMIT 1`,
+    [hash],
   );
   const u = rows[0];
   if (!u) {
     res.status(401).json({ error: "Your session expired. Sign in again." });
     return null;
+  }
+  // Slide the idle window at most once every few minutes: a write on every API call is
+  // pure overhead against a remote Postgres, and a page load makes several calls.
+  if (new Date(u.expires_at).getTime() - Date.now() < (IDLE_MINUTES - 5) * 60_000) {
+    await q(
+      `UPDATE auth_session SET expires_at = now() + make_interval(mins => $2)
+       WHERE refresh_token_hash = $1`,
+      [hash, IDLE_MINUTES],
+    );
   }
   req.user = { user_id: u.user_id, name: u.name, roles: u.roles ?? [] };
   return { user_id: u.user_id, name: u.name, email: u.email, roles: u.roles ?? [] };
@@ -176,6 +191,13 @@ async function activeProducts(): Promise<Record<string, unknown>[]> {
 const fails = new Map<string, { n: number; until: number }>();
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
+
+/** Drops finished counters so someone probing thousands of emails cannot grow this map forever. */
+function pruneFails(): void {
+  if (fails.size < 500) return;
+  const now = Date.now();
+  for (const [key, f] of fails) if (f.n === 0 && f.until < now) fails.delete(key);
+}
 
 /** Anything that can run a statement: the pool, or a transaction client. */
 type Runner = (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
@@ -325,6 +347,7 @@ api.post("/auth/login", asyncWrap(async (req, res) => {
       cur.n = 0;
     }
     fails.set(key, cur);
+    pruneFails();
     return void fail(res, 401, "Email or password is incorrect.");
   }
   fails.delete(key);
@@ -434,6 +457,14 @@ api.get("/products/:id", asyncWrap(async (req, res) => {
   );
   const product = rows[0];
   if (!product) return void fail(res, 404, "Product not found.");
+  // Paused and removed listings stay visible to their seller (and to admins), not to buyers.
+  if (product.listing_status !== "active") {
+    const token = (req.cookies as Record<string, string> | undefined)?.sid;
+    const viewer = token ? await sessionUser(token) : null;
+    const isOwner = viewer?.user_id === String(product.seller_id);
+    const isAdmin = !!viewer?.roles.some(r => r === "admin" || r === "super_admin");
+    if (!isOwner && !isAdmin) return void fail(res, 404, "Product not found.");
+  }
   const [reviews, rating] = await Promise.all([
     q<{ rating: number; comment: string; buyer_name: string; created_at: Date }>(
       `SELECT r.rating, r.comment, u.name AS buyer_name, r.created_at
@@ -616,12 +647,20 @@ async function orderView(orderId: string): Promise<Record<string, unknown> | nul
       unitMinor: Number(i.unit_price_minor), lineMinor: Number(i.line_total_minor),
     })),
   }));
-  // payment state mirrors the market_order status
-  const payment = head.order_status === "pending" ? "pending" : head.order_status === "cancelled" ? "failed" : "captured";
+  // Payment state comes from the payment rows, never from the order status: checkouts that
+  // were confirmed before a provider existed have no payment, and calling those "captured" lies.
+  const { rows: pays } = await q<{ status: string; provider_receipt: string | null; amount_minor: string }>(
+    `SELECT status, provider_receipt, amount_minor FROM payment
+     WHERE order_id = $1 ORDER BY created_at DESC, payment_id DESC`, [orderId]);
+  const settled = pays.find(p => ["captured", "partially_refunded", "refunded"].includes(p.status));
+  const waiting = pays.find(p => p.status === "created" || p.status === "requires_action");
+  const payment = settled ? settled.status : waiting ? "pending" : "none";
   return {
     id: head.order_id,
     status: head.order_status,
     payment,
+    paidMinor: settled ? Number(settled.amount_minor) : 0,
+    receipt: settled?.provider_receipt ?? null,
     currency: head.currency,
     totalMinor: Number(head.total_amount_minor),
     orderedAt: head.ordered_at,
@@ -928,7 +967,15 @@ api.post("/order/:id/pay", asyncWrap(async (req, res) => {
  * Daraja posts the STK result here. It retries until it gets a 200, so unknown and
  * duplicate notifications are acknowledged and ignored instead of being retried forever.
  */
-api.post("/webhooks/mpesa", asyncWrap(async (req, res) => {
+api.post("/webhooks/mpesa/:secret?", asyncWrap(async (req, res) => {
+  // Daraja cannot sign callbacks, so the URL itself carries a shared secret.
+  if (MPESA.callbackSecret) {
+    const given = Buffer.from(String(req.params.secret ?? ""));
+    const want = Buffer.from(MPESA.callbackSecret);
+    if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
+      return void res.status(404).json({ error: "not found" });
+    }
+  }
   const cb = parseCallback(req.body);
   if (!cb) return void res.status(200).json({ ResultCode: 0, ResultDesc: "Ignored" });
 
@@ -941,6 +988,12 @@ api.post("/webhooks/mpesa", asyncWrap(async (req, res) => {
   if (!pay) {
     console.warn("mpesa callback for an unknown checkout", cb.checkoutRequestId, cb.resultDesc);
     return void res.status(200).json({ ResultCode: 0, ResultDesc: "Unknown payment" });
+  }
+  // A success that charges a different amount than we asked for is not our settlement.
+  if (cb.resultCode === 0 && cb.amount !== null && Math.round(cb.amount * 100) !== Number(pay.amount_minor)) {
+    console.warn(`mpesa callback paid ${cb.amount} for payment ${pay.payment_id}, expected ` +
+      `${Number(pay.amount_minor) / 100}; ignored`);
+    return void res.status(200).json({ ResultCode: 0, ResultDesc: "Amount mismatch" });
   }
 
   // Replays are absorbed by the unique (provider, event) key on provider_event.
@@ -1137,7 +1190,8 @@ function readListing(body: Record<string, unknown>): { error?: string; value?: R
   const price = Number.isFinite(priceRaw) && priceRaw > 0 ? Math.round(priceRaw * 100) / 100 : NaN;
   const qty = Number(body.qty);
   const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
-  const status = ["draft", "active", "paused", "removed"].includes(String(body.status)) ? String(body.status) : "draft";
+  // "removed" is a moderation decision: it is set in the admin panel, never by the seller.
+  const status = ["draft", "active", "paused"].includes(String(body.status)) ? String(body.status) : "draft";
   if (!title || title.length > 200) return { error: "Title is required (max 200 characters)." };
   if (imageUrl.length > 500) return { error: "Image URL must be 500 characters or fewer." };
   if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return { error: "Image URL must start with http:// or https://." };
@@ -1177,8 +1231,12 @@ api.put("/seller/listings/:id", asyncWrap(async (req, res) => {
   if (!user) return;
   if (!hasRole(user, "seller")) return void fail(res, 403, "Become a seller first.");
   const id = Number(req.params.id);
-  const owned = await q(`SELECT 1 FROM product WHERE product_id = $1 AND seller_id = $2`, [id, user.user_id]);
+  const owned = await q<{ listing_status: string }>(
+    `SELECT listing_status FROM product WHERE product_id = $1 AND seller_id = $2`, [id, user.user_id]);
   if (!owned.rows.length) return void fail(res, 404, "Listing not found.");
+  if (owned.rows[0].listing_status === "removed") {
+    return void fail(res, 409, "This listing was removed by an admin, so it can no longer be edited.");
+  }
   const parsed = readListing(req.body as Record<string, unknown>);
   if (parsed.error) return void fail(res, 400, parsed.error);
   const v = parsed.value as { title: string; categoryId: number; asking_price: number;
@@ -1197,6 +1255,44 @@ interface SellerOrderCtx {
   soId: number;
   sellerId: string;
   buyerId: string;
+}
+
+/**
+ * Keeps market_order in step with its seller orders. Same rule the admin panel applies:
+ * every slice cancelled -> cancelled, every slice finished -> completed, anything else
+ * that has started -> confirmed. Refund states are left alone.
+ */
+async function rollUpOrderStatus(client: Tx, orderId: string): Promise<string | null> {
+  const { rows } = await client.query<{
+    total: string; completed: string; cancelled: string; started: string;
+  }>(
+    `SELECT count(*)::text AS total,
+            count(*) FILTER (WHERE fulfillment_status = 'completed')::text AS completed,
+            count(*) FILTER (WHERE fulfillment_status = 'cancelled')::text AS cancelled,
+            count(*) FILTER (WHERE fulfillment_status IN ('confirmed','processing','shipped','delivered'))::text AS started
+     FROM seller_order WHERE order_id = $1`,
+    [orderId],
+  );
+  const r = rows[0];
+  const total = Number(r?.total ?? 0);
+  const completed = Number(r?.completed ?? 0);
+  const cancelled = Number(r?.cancelled ?? 0);
+  const started = Number(r?.started ?? 0);
+  let next: string | null = null;
+  if (total > 0 && cancelled === total) next = "cancelled";
+  else if (completed > 0 && completed + cancelled === total) next = "completed";
+  else if (started + completed > 0) next = "confirmed";
+  if (!next) return null;
+  const updated = await client.query(
+    `UPDATE market_order SET order_status = $2
+     WHERE order_id = $1
+       AND order_status IN ('pending','confirmed','completed','cancelled')
+       AND order_status <> $2
+       AND ($2 <> 'confirmed' OR order_status = 'pending')
+     RETURNING order_status`,
+    [orderId, next],
+  );
+  return updated.rows.length ? next : null;
 }
 
 async function assertSellerOrder(req: Request, res: Response): Promise<SellerOrderCtx | null> {
@@ -1237,14 +1333,32 @@ api.post("/seller-orders/:id/status", asyncWrap(async (req, res) => {
   const guardKey = `${needSeller ? "seller" : "buyer"}:${actor.split(":")[1]}`;
   const flow = FULFILLMENT_FLOW[guardKey];
   if (!flow) return void fail(res, 400, "Unknown action.");
-  await q(
-    `UPDATE seller_order SET fulfillment_status = $3, updated_at = now(),
-       tracking_number = CASE WHEN $4::varchar IS NULL THEN tracking_number ELSE $4 END
-     WHERE seller_order_id = $2 AND fulfillment_status = $1`,
-    [flow.from, ctx.soId, flow.to, (req.body as { tracking?: string }).tracking ?? null]);
-  const { rows } = await q<{ fulfillment_status: string }>(
-    `SELECT fulfillment_status FROM seller_order WHERE seller_order_id = $1`, [ctx.soId]);
-  if (rows[0]?.fulfillment_status !== flow.to) {
+  // One transaction: moving a seller order and rolling up its checkout must never split.
+  const movedOrderId = await (async (): Promise<string | null> => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const updated = await client.query<{ order_id: string }>(
+        `UPDATE seller_order SET fulfillment_status = $3, updated_at = now(),
+           tracking_number = CASE WHEN $4::varchar IS NULL THEN tracking_number ELSE $4 END
+         WHERE seller_order_id = $2 AND fulfillment_status = $1
+         RETURNING order_id`,
+        [flow.from, ctx.soId, flow.to, (req.body as { tracking?: string }).tracking ?? null]);
+      if (!updated.rows.length) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+      await rollUpOrderStatus(client, updated.rows[0].order_id);
+      await client.query("COMMIT");
+      return updated.rows[0].order_id;
+    } catch (e) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  })();
+  if (!movedOrderId) {
     return void fail(res, 409, `This order is no longer "${flow.from}". Refresh and try again.`);
   }
   res.json({ ok: true, fulfillment: flow.to });

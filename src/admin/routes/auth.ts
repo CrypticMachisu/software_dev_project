@@ -11,6 +11,13 @@ const fails = new Map<string, { n: number; until: number }>();
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
 
+/** Drops finished counters so probing many emails cannot grow this map without bound. */
+function pruneFails(): void {
+  if (fails.size < 500) return;
+  const now = Date.now();
+  for (const [key, f] of fails) if (f.n === 0 && f.until < now) fails.delete(key);
+}
+
 authRouter.get("/login", (_req, res) => {
   res.render("login", { error: null });
 });
@@ -54,6 +61,7 @@ authRouter.post("/login", async (req, res, next) => {
         cur.n = 0;
       }
       fails.set(key, cur);
+      pruneFails();
       if (u) await logAction({ query }, u.user_id, "auth.login_failed", "app_user", u.user_id, req.ip);
       res.status(401).render("login", { error: "Invalid email or password." });
       return;

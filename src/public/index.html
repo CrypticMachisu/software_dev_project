@@ -372,6 +372,7 @@ let keepScroll=false;
 const checkout={address:store.get("mkt_addr",{}),methods:{}};
 const STEPS=["pending","confirmed","shipped","completed"],
  LABEL={pending:"New",confirmed:"Confirmed",shipped:"Shipped",completed:"Completed",cancelled:"Cancelled",refunded:"Refunded",partially_refunded:"Partially refunded"};
+const resultPoll={id:null,n:0}; // keeps the result page from polling a payment forever
 
 /* ===== Rendering Views ===== */
 const stars=n=>"★".repeat(Math.round(n))+"☆".repeat(5-Math.round(n));
@@ -466,7 +467,9 @@ V.pay=async([id])=>{const {order:o}=await api("/order/"+encodeURIComponent(id));
   <p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel order instead</button></p></div>`;
  return `<div class="card" style="max-width:420px;margin:2rem auto"><h1>Payment provider</h1><p class="mute">Simulated provider page for order #${o.id}.</p>${o.delivery?.street?`<p class="mute">Deliver to ${esc(o.delivery.name)} · ${esc(o.delivery.street)}, ${esc(o.delivery.city)}</p>`:""}<p class="price" style="font-size:1.4rem">${money(o.totalMinor,o.currency)}</p><div class="row"><button data-act="pay" data-id="${o.id}" data-s="captured">Pay now</button><button class="ghost" data-act="pay" data-id="${o.id}" data-s="failed">Cancel payment</button></div><p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel order instead</button></p></div>`};
 V.result=async([id])=>{const {order:o}=await api("/order/"+encodeURIComponent(id));
- if(o.status=="pending"){const mpesa=db.payment?.provider==="mpesa";setTimeout(()=>route(),mpesa?1500:700);return `<div class="card" style="max-width:480px;margin:2rem auto"><h1>Confirming your payment…</h1><p class="mute">${mpesa?"Approve the M-Pesa prompt on your phone by entering your PIN. This page updates by itself.":"Waiting for the payment provider. This page updates by itself."}</p>${mpesa?`<p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel this order</button></p>`:""}</div>`}
+ if(o.status=="pending"){if(resultPoll.id!==o.id){resultPoll.id=o.id;resultPoll.n=0}resultPoll.n++;
+  if(resultPoll.n>40)return `<div class="card" style="max-width:480px;margin:2rem auto"><h1>Still waiting</h1><p class="mute">The provider has not confirmed this payment yet. If money left your account it is still recorded; check your orders in a minute.</p><div class="row"><a class="btn" href="#/orders">View my orders</a><button class="sm ghost" data-act="retry">Check again</button></div></div>`;
+  const mpesa=db.payment?.provider==="mpesa";setTimeout(()=>route(),mpesa?1500:700);return `<div class="card" style="max-width:480px;margin:2rem auto"><h1>Confirming your payment…</h1><p class="mute">${mpesa?"Approve the M-Pesa prompt on your phone by entering your PIN. This page updates by itself.":"Waiting for the payment provider. This page updates by itself."}</p>${mpesa?`<p style="margin-top:.8rem"><button class="sm ghost" data-act="cancelOrder" data-id="${o.id}">Cancel this order</button></p>`:""}</div>`}
  if(o.status=="cancelled")return`<div class="card" style="max-width:480px;margin:2rem auto"><h1>Payment did not go through</h1><p>Your order was not charged. Try again or change your cart.</p><div class="row"><a class="btn" href="#/pay/${o.id}">Retry payment</a><a href="#/cart">Back to cart</a></div></div>`;
  return `<div class="card" style="max-width:520px;margin:2rem auto"><h1 class="ok">Order placed</h1><p>Order #${o.id}: payment confirmed by the provider.</p>${o.sellerOrders.map(s=>`<div class="row"><span class="sp">${esc(s.sellerName)} · ${s.items.length} item(s)</span><span class="chip">${LABEL[s.fulfillment]??s.fulfillment}</span></div>`).join("")}<div class="row" style="margin-top:1rem"><a class="btn" href="#/orders">View my orders</a><a href="#/">Keep shopping</a></div></div>`};
 const stepper=s=>{const i=STEPS.indexOf(s.fulfillment);
@@ -512,7 +515,7 @@ V.edit=async([id])=>{const isNew=id=="new";
 
 /* ===== Click Actions and Event Listeners ===== */
 const A={
- retry(){route()},
+ retry(){resultPoll.id=null;resultPoll.n=0;route()},
  async logout(){await auth.logout();navbar();route()},
  mode(e){state.mode=e.dataset.m;route()},
  cat(e){catalog.categoryId=+e.dataset.id;keepScroll=true;route()},
@@ -536,8 +539,8 @@ const A={
  },
  rm(e){cart.removeItem(+e.dataset.id);route()},
  cancelOrder(e){if(!confirm("Cancel this unpaid order?"))return;call("POST",`/order/${e.dataset.id}/cancel`).then(()=>{toast("Order cancelled");route()}).catch(x=>toast(x.message))},
- pay(e){const id=+e.dataset.id,st=e.dataset.s;if(st=="captured")cart.clear();navbar();location.hash="#/result/"+id;
-  call("POST",`/order/${id}/pay`,{result:st}).then(()=>route()).catch(x=>toast(x.message))},
+ pay(e){const id=+e.dataset.id,st=e.dataset.s;navbar();location.hash="#/result/"+id;
+  call("POST",`/order/${id}/pay`,{result:st}).then(()=>{if(st==="captured")cart.clear();navbar();route()}).catch(x=>toast(x.message))},
  stk(e){const id=+e.dataset.id,inp=document.getElementById("phone"),err=document.getElementById("err");if(err)err.textContent="";e.disabled=true;
   call("POST",`/order/${id}/pay`,{phone:inp?inp.value.trim():""}).then(()=>{location.hash="#/result/"+id}).catch(x=>{e.disabled=false;if(err)err.textContent=x.message;else toast(x.message)})},
  receive(e){call("POST",`/seller-orders/${e.dataset.id}/status`,{action:"buyer:receive"}).then(()=>route()).catch(x=>toast(x.message))},

@@ -54,6 +54,12 @@
     <div class="col-auto"><button class="btn btn-success btn-sm">Update status</button></div>
   </form>
   <% } else { %><p class="text-muted small mb-0">This seller order is final ("<%= so.fulfillment_status %>") and cannot be changed.</p><% } %>
+  <% if (so.refundable) { %>
+  <form class="row g-2 align-items-center mt-2" method="post" action="/admin/orders/seller-orders/<%= so.seller_order_id %>/refund" data-confirm="Record a refund for this seller order? The money must be reversed in the provider dashboard separately.">
+    <div class="col-auto"><input class="form-control form-control-sm" name="reason" maxlength="300" placeholder="Reason (optional)"></div>
+    <div class="col-auto"><button class="btn btn-outline-danger btn-sm">Record refund</button></div>
+  </form>
+  <% } %>
 </div></div>
 <% }) %>
 <%- include('partials/footer') %>
