@@ -11,6 +11,8 @@ import { dashboardRouter } from "./routes/dashboard.js";
 import { exchangeRouter } from "./routes/exchange.js";
 import { ordersRouter } from "./routes/orders.js";
 import { payoutsRouter } from "./routes/payouts.js";
+import { helpRouter } from "./routes/help.js";
+import { reportsRouter } from "./routes/reports.js";
 import { productsRouter } from "./routes/products.js";
 import { resetRouter } from "./routes/reset.js";
 import { usersRouter } from "./routes/users.js";
@@ -60,9 +62,11 @@ adminApp.use("/admin/users", requireAdmin, usersRouter);
 adminApp.use("/admin/products", requireAdmin, productsRouter); // products + categories
 adminApp.use("/admin/orders", requireAdmin, ordersRouter);
 adminApp.use("/admin/payouts", requireAdmin, payoutsRouter);
+adminApp.use("/admin/reports", requireAdmin, reportsRouter);
+adminApp.use("/admin/help", requireAdmin, helpRouter);
 adminApp.use("/admin/exchange", requireAdmin, requireRole("super_admin"), exchangeRouter); // super admin only
 adminApp.use("/admin/audit", requireAdmin, requireRole("super_admin"), auditRouter); // super admin only
-// Later modules: reports
+
 
 adminApp.use((_req, res) => {
   res.status(404).render("error", { title: "Not found", message: "Page not found." });

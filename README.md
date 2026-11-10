@@ -20,7 +20,8 @@ see revenue, units and top listings.
 
 **Admins** (`/admin`) — dashboard, user search and management (suspend, roles, approval,
 reset links), product and category moderation with an audit trail, the full order pipeline,
-a payout queue, exchange methods, and audit logs. Super admins additionally manage exchange
+a payout queue, a printable sales report with its own filters, in-app help, exchange methods,
+and audit logs. Super admins additionally manage exchange
 methods and audit logs and can act on admin accounts.
 
 Every privileged change writes an `audit_log` row **in the same transaction** as the change.
@@ -174,6 +175,14 @@ password `password123`.
 (auth, catalogue, checkout, payment, seller transitions) against `BASE_URL`, and
 `scripts/check-contrast.mjs` checks the palette. Both are manual harnesses rather than a
 test runner; runs are pointed at a scratch database, never at demo data.
+
+## Documentation
+
+`README.md` (this file) explains the architecture and the money model, `INSTALL.md` covers
+setup and M-Pesa, and `docs/USER_MANUAL.md` walks through the storefront, seller and admin
+flows. The admin panel also has a built-in **Help** page at `/admin/help`, and **Reports** at
+`/admin/reports` produces a printable sales report with company header, period, filters,
+sorting and generation time.
 
 ## Money is recorded, not moved
 

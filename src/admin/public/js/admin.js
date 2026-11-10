@@ -5,6 +5,13 @@ document.addEventListener("submit", function (e) {
   if (message && !window.confirm(message)) e.preventDefault();
 });
 
+// Report printing: <button data-print> opens the browser's print / save-as-PDF dialog.
+// The print stylesheet drops the sidebar, the filter bar and the log-out header.
+document.addEventListener("click", function (e) {
+  var trigger = e.target && e.target.closest ? e.target.closest("[data-print]") : null;
+  if (trigger) window.print();
+});
+
 // Product image URL preview: input[type=url] + img[data-image-preview], wrapped in [data-image-preview-wrap].
 document.addEventListener("DOMContentLoaded", function () {
   var input = document.querySelector('[name="imageUrl"]');

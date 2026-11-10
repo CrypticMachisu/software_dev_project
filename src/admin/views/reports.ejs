@@ -1,0 +1,121 @@
+<%- include('partials/header') %>
+<% const badge = { pending: 'secondary', confirmed: 'info', completed: 'success', cancelled: 'danger', refunded: 'dark', partially_refunded: 'warning' };
+   const period = (f.from ? f.from : 'Beginning') + ' to ' + (f.to ? f.to : 'today');
+   const valueTotal = totals.reduce((n, t) => n + Number(t.value_minor), 0);
+   const ordersTotal = totals.reduce((n, t) => n + Number(t.orders), 0); %>
+
+<div class="no-print">
+  <form class="row g-2 mb-3" method="get" action="/admin/reports">
+    <div class="col-md-2"><label class="form-label" for="from">From</label><input class="form-control" id="from" type="date" name="from" value="<%= f.from %>"></div>
+    <div class="col-md-2"><label class="form-label" for="to">To</label><input class="form-control" id="to" type="date" name="to" value="<%= f.to %>"></div>
+    <div class="col-md-2">
+      <label class="form-label" for="currency">Currency</label>
+      <select class="form-select" id="currency" name="currency">
+        <option value="">Any currency</option>
+        <% currencies.forEach(c => { %><option value="<%= c %>" <%= f.currency === c ? 'selected' : '' %>><%= c %></option><% }) %>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label" for="status">Status</label>
+      <select class="form-select" id="status" name="status">
+        <option value="">Any status</option>
+        <% statuses.forEach(s => { %><option value="<%= s %>" <%= f.status === s ? 'selected' : '' %>><%= s.replace('_', ' ') %></option><% }) %>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label" for="sort">Sort by</label>
+      <select class="form-select" id="sort" name="sort">
+        <option value="date" <%= f.sort === 'date' ? 'selected' : '' %>>Date</option>
+        <option value="total" <%= f.sort === 'total' ? 'selected' : '' %>>Total</option>
+        <option value="order" <%= f.sort === 'order' ? 'selected' : '' %>>Order number</option>
+        <option value="buyer" <%= f.sort === 'buyer' ? 'selected' : '' %>>Buyer</option>
+      </select>
+    </div>
+    <div class="col-md-1">
+      <label class="form-label" for="dir">Order</label>
+      <select class="form-select" id="dir" name="dir">
+        <option value="desc" <%= f.dir === 'desc' ? 'selected' : '' %>>Desc</option>
+        <option value="asc" <%= f.dir === 'asc' ? 'selected' : '' %>>Asc</option>
+      </select>
+    </div>
+    <div class="col-12 d-flex gap-2 mt-2">
+      <button class="btn btn-success">Run report</button>
+      <a class="btn btn-outline-secondary" href="/admin/reports">Clear</a>
+      <button class="btn btn-outline-secondary ms-auto" type="button" data-print>Print / Save as PDF</button>
+    </div>
+  </form>
+</div>
+
+<article class="report card" aria-label="Sales report">
+  <div class="card-body">
+    <header class="report-head">
+      <svg class="report-logo" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect width="64" height="64" rx="14" fill="#1f2119"></rect>
+        <path d="M18 45V19l14 14 14-14v26" fill="none" stroke="#f3efe5" stroke-width="4" stroke-linejoin="round"></path>
+      </svg>
+      <div>
+        <div class="report-company">M-DUKA<span class="report-dot">.</span></div>
+        <div class="report-sub">Multi-seller marketplace · Sales report</div>
+      </div>
+      <div class="report-title">
+        <div class="report-meta"><span>Period: <strong><%= period %></strong></span></div>
+        <div class="report-meta"><span>Generated: <strong><%= fmtDate(generatedAt) %></strong></span></div>
+        <div class="report-meta"><span>Prepared by: <strong><%= preparedBy %></strong></span></div>
+      </div>
+    </header>
+
+    <div class="report-meta report-filters">
+      <span>Filters: <strong><%= f.currency || 'all currencies' %></strong> · <strong><%= f.status ? f.status.replace('_', ' ') : 'all statuses' %></strong></span>
+      <span>Sorted by <strong><%= f.sort %></strong> (<%= f.dir %>)</span>
+    </div>
+
+    <div class="table-responsive report-totals">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Currency</th><th class="text-end">Orders</th><th class="text-end">Order value</th><th class="text-end">Confirmed / completed value</th></tr></thead>
+        <tbody>
+        <% if (!totals.length) { %>
+          <tr><td colspan="4" class="text-muted">No orders match these filters.</td></tr>
+        <% } else { totals.forEach(t => { %>
+          <tr>
+            <td><strong><%= t.currency %></strong></td>
+            <td class="text-end"><%= t.orders %></td>
+            <td class="text-end"><%= money(t.value_minor, t.currency) %></td>
+            <td class="text-end"><%= money(t.settled_minor, t.currency) %></td>
+          </tr>
+        <% }) } %>
+        </tbody>
+        <% if (totals.length > 1) { %><tfoot><tr class="fw-semibold"><td>All currencies</td><td class="text-end"><%= ordersTotal %></td><td class="text-end" colspan="2">Totals shown per currency</td></tr></tfoot><% } %>
+      </table>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm align-middle report-table mb-0">
+        <thead><tr>
+          <th>Order</th><th>Date</th><th>Buyer</th><th class="text-end">Sellers</th>
+          <th class="text-end">Total</th><th>Status</th><th>Payment</th>
+        </tr></thead>
+        <tbody>
+        <% if (!rows.length) { %>
+          <tr><td colspan="7" class="text-muted">No orders match these filters.</td></tr>
+        <% } else { rows.forEach(o => { %>
+          <tr>
+            <td>#<%= o.order_id %></td>
+            <td><%= fmtDate(o.ordered_at) %></td>
+            <td><%= o.buyer %><div class="text-muted small"><%= o.buyer_email %></div></td>
+            <td class="text-end"><%= o.sellers %></td>
+            <td class="text-end"><%= money(o.total_amount_minor, o.currency) %></td>
+            <td><span class="badge text-bg-<%= badge[o.order_status] || 'secondary' %>"><%= o.order_status.replace('_', ' ') %></span></td>
+            <td><%= o.payment_status || 'none' %></td>
+          </tr>
+        <% }) } %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (capped) { %>
+      <p class="text-muted small mt-3 mb-0">Showing the first <%= limit %> matching orders. Narrow the period or add a filter to print the rest.</p>
+    <% } %>
+    <p class="report-foot text-muted small mt-3 mb-0">M-DUKA · report generated from live marketplace data · <%= valueTotal ? '' : '' %><%= rows.length %> row(s) listed.</p>
+  </div>
+</article>
+<%- include('partials/footer') %>

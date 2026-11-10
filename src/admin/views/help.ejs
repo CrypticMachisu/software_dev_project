@@ -1,0 +1,78 @@
+<%- include('partials/header') %>
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card"><div class="card-body">
+      <h2 class="h5">The short version</h2>
+      <p class="mb-2">Every checkout becomes one <strong>order</strong> and one <strong>seller order</strong> per seller. The buyer pays; each seller fulfils their own slice; the buyer confirms receipt; the money owed to the seller becomes payable; an admin records the payout. Refunds and payouts are <em>records</em> of money moved elsewhere — this panel never moves money by itself.</p>
+      <ol class="mb-0">
+        <li><strong>User registers</strong> — a buyer account is created immediately.</li>
+        <li><strong>Seller applies</strong> — approved on <a href="/admin/users?approval=pending">Seller approvals</a>.</li>
+        <li><strong>Buyer checks out</strong> — stock is checked and reserved at payment capture.</li>
+        <li><strong>Seller confirms → ships</strong> — the buyer follows the order on the storefront.</li>
+        <li><strong>Buyer confirms receipt</strong> — the seller's proceeds become eligible.</li>
+        <li><strong>Admin pays out</strong> — on <a href="/admin/payouts">Payouts</a>, with the provider reference.</li>
+      </ol>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Orders</h2>
+      <p><a href="/admin/orders">Orders</a> lists checkouts with filters for buyer, status and date. Open one to see its payments, delivery address and each seller's slice. Use the status buttons to move a slice through <em>pending → confirmed → processing → shipped → delivered → completed</em>, or to cancel/return it. The checkout status follows automatically.</p>
+      <p class="mb-0">A paid checkout cannot be cancelled from the buyer side; use a refund instead.</p>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Refunds</h2>
+      <p>A buyer can request a refund once they have confirmed receipt. The request appears on the seller order as <em>requested</em> and blocks the payout.</p>
+      <p class="mb-0">Recording the refund on the order page reverses the seller's allocation and marks the payment/checkout refunded (partially when other sellers are unaffected). Move the money back in the M-Pesa or bank dashboard — this panel only records it. A payout already marked paid must be reversed before a refund is allowed.</p>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Payouts</h2>
+      <p>Money becomes <em>eligible</em> when the buyer confirms receipt. On <a href="/admin/payouts">Payouts</a>, send the transfer in the provider dashboard first, then record the reference here. The same reference cannot be booked twice.</p>
+      <p class="mb-0">Rows marked <em>requested</em> are buyers asking for a refund, not payout requests — settle those from the order page.</p>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Users, roles and passwords</h2>
+      <p><a href="/admin/users">Users</a> lets you create accounts, approve or reject role applications, suspend or reactivate accounts, and issue a one-time password reset link. Suspending an account signs that user out immediately.</p>
+      <p class="mb-0">Reset links are shown once and are valid for a short period; copy the link and send it to the user yourself — this app does not send email. Super admins additionally manage <a href="/admin/exchange">exchange methods</a> and read <a href="/admin/audit">audit logs</a>.</p>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <h2 class="h5">Reports</h2>
+      <p><a href="/admin/reports">Reports</a> produces a printable sales report: choose a period, currency and status, sort by date, total, order number or buyer, then use <em>Print / Save as PDF</em>. The printed page keeps the company header, the period and the generation time.</p>
+      <p class="mb-0">The report lists at most <%= 500 %> rows; narrow the period for a complete printout.</p>
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">Quick links</h2>
+      <ul class="mb-0">
+        <li><a href="/admin">Dashboard</a> — revenue trend, pipeline, low stock.</li>
+        <li><a href="/admin/orders">Orders</a> — fulfilment and refunds.</li>
+        <li><a href="/admin/payouts">Payouts</a> — record seller transfers.</li>
+        <li><a href="/admin/products">Products</a> — catalogue and categories.</li>
+        <li><a href="/admin/users">Users</a> — accounts and roles.</li>
+        <li><a href="/admin/reports">Reports</a> — printable sales report.</li>
+        <li><a href="/admin/audit">Audit logs</a> — who changed what (super admin).</li>
+      </ul>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <h2 class="h6">When something looks wrong</h2>
+      <ul class="mb-0">
+        <li><strong>Payment taken, order pending</strong> — check the order's payment rows; if the callback carried a different amount it is ignored on purpose and must be reconciled manually.</li>
+        <li><strong>Payout button refuses</strong> — the seller order is not eligible yet, or a refund request is open.</li>
+        <li><strong>Refund button missing</strong> — the seller was already paid; reverse the payout first.</li>
+        <li><strong>Listing vanished</strong> — it was paused, removed, or the seller edited it.</li>
+      </ul>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <h2 class="h6">Documentation</h2>
+      <p class="mb-0">The full user manual is in <code>docs/USER_MANUAL.md</code>; setup and M-Pesa configuration are in <code>INSTALL.md</code>; the system overview and diagrams are in <code>README.md</code>.</p>
+    </div></div>
+  </div>
+</div>
+<%- include('partials/footer') %>

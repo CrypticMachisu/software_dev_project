@@ -124,3 +124,32 @@ a:hover{color:var(--acc-deep)}
   .signed-in{margin:0 0 0 auto}
   .admin-main{padding:18px}
 }
+
+/* ---- reports ---- */
+.report-head{display:flex;gap:18px;align-items:flex-start;border-bottom:2px solid var(--ink);
+  padding-bottom:14px;margin-bottom:16px}
+.report-logo{width:56px;height:56px;flex:none}
+.report-company{font-family:Fraunces,Georgia,serif;font-size:1.5rem;font-weight:600;letter-spacing:-.01em}
+.report-dot{color:var(--acc)}
+.report-sub{color:var(--mute);font-size:.85rem}
+.report-title{margin-left:auto;text-align:right}
+.report-meta{display:flex;flex-wrap:wrap;gap:4px 22px;font-size:.8rem;color:var(--mute)}
+.report-meta strong{color:var(--ink);font-weight:600}
+.report-filters{margin-bottom:14px}
+.report-totals{margin-bottom:18px}
+.report-table{font-variant-numeric:tabular-nums}
+.report-foot{border-top:1px solid var(--line-soft);padding-top:8px}
+
+@media print{
+  @page{margin:14mm}
+  body{background:#fff;color:#000;font-size:11pt}
+  .admin-sidebar,.admin-main>header,.no-print,.alert{display:none!important}
+  .admin-shell{display:block!important}
+  .admin-main{padding:0!important}
+  .card{border:0!important;box-shadow:none!important;background:#fff!important}
+  .report-head{border-bottom:1.5pt solid #000}
+  .report-table thead th{border-bottom:1pt solid #000}
+  .report-table td,.report-table th{padding:4px 6px}
+  tr{break-inside:avoid}
+  a{color:#000;text-decoration:none}
+}
