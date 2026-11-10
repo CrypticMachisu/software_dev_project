@@ -79,3 +79,36 @@ stops anyone who learns a checkout id from confirming an unpaid order. Set
 
 Switching `PAYMENT_PROVIDER` back to `demo` restores the simulated checkout, so a demo
 never depends on the sandbox.
+
+## Admin two-factor authentication (TOTP)
+
+Admins can protect the panel with a 6-digit code from any authenticator app (Google
+Authenticator, Authy, 1Password, Microsoft Authenticator). It is optional and per account.
+
+1. Sign in to `/admin`, open **Security** in the sidebar.
+2. Choose **Set up two-factor authentication**. A base32 key is shown once; add it to the
+   authenticator app (or use the `otpauth://` link), then enter the code the app shows.
+3. From then on, signing in asks for the password and then a code.
+
+Recovery: if the authenticator is lost, a super admin opens the account under **Users** and uses
+**Reset 2FA**. The admin can sign in with the password and enrol again. Every step writes an
+audit row (`admin.2fa_enabled`, `admin.2fa_disabled`, `user.2fa_reset`).
+
+Run `npm run migrate` after upgrading: `SQL/007_admin_2fa.sql` adds the columns. A code is
+accepted once; replaying the same code is refused even inside its 30-second window.
+
+## Deploying with Docker
+
+`Dockerfile` builds the TypeScript and ships only the compiled output plus the views, static
+assets and `SQL/`:
+
+    docker build -t mduka .
+    docker run --rm -p 3000:3000 \
+      -e DATABASE_URL="postgres://..." -e DATABASE_SSL=true \
+      -e APP_CURRENCY=KES -e NODE_ENV=production mduka
+
+Apply migrations once against the same database (`npm run migrate` from a checkout, or
+`docker run --rm -e DATABASE_URL=... mduka node dist/src/migrate.js`), then start the container.
+The image runs as the unprivileged `node` user and reads configuration from the environment,
+never from a baked `.env`. Put HTTPS in front of it (a reverse proxy, Render, Fly.io or Railway)
+so the session cookie is marked `Secure`.

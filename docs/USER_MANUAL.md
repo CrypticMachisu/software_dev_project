@@ -142,7 +142,25 @@ methods are offered at checkout.
 A searchable, filterable trail of privileged actions: who did what, to which record, from which IP
 and when. Every admin change writes its audit row in the same transaction as the change.
 
-### 4.9 Help
+### 4.9 Security (two-factor authentication)
+
+Every admin can add a second step to their own sign-in. It is optional.
+
+1. Open **Security** in the sidebar.
+2. Select **Set up two-factor authentication**. A key is shown once.
+3. Add the key to an authenticator app (Google Authenticator, Authy, 1Password, Microsoft
+   Authenticator), or open the `otpauth://` link on the phone.
+4. Enter the 6-digit code the app displays and select **Confirm**. Two-factor is on.
+
+From then on, signing in asks for your email and password, then a 6-digit code. A code works
+once; if it is refused, wait for the next one. To turn it off, open **Security**, enter a
+current code and select **Turn off**.
+
+**If the authenticator is lost:** a super admin opens your account under *Users* and selects
+**Reset 2FA**. You then sign in with your password and set it up again. The reset is recorded in
+the audit log.
+
+### 4.10 Help
 
 **Help** in the sidebar summarises the order lifecycle, refunds, payouts, user administration,
 reports and common problems. This manual is the longer version.
@@ -154,7 +172,7 @@ reports and common problems. This manual is the longer version.
 | Buyer | browse, order, pay, confirm receipt, request refunds, review sellers |
 | Seller | everything a buyer can, plus listings, seller orders and seller statistics |
 | Admin | the admin panel: users, products, orders, payouts, reports, help |
-| Super admin | everything an admin can, plus exchange methods, audit logs and admin-account actions |
+| Super admin | everything an admin can, plus exchange methods, audit logs, admin-account actions and resetting another admin's two-factor authentication |
 
 Roles are additive: a user can be a buyer and a seller at the same time. Every admin route
 requires a signed-in session; super-admin-only routes also check the role on each request.
@@ -171,6 +189,8 @@ requires a signed-in session; super-admin-only routes also check the role on eac
 | Reset link says it is invalid | It expired or was already used. Issue a new link from the user's page. |
 | Sessions gone after a restart | Admin and API sessions are database-backed; a suspension or password reset revokes them by design. |
 | Images do not load | Image URLs must start with `http://` or `https://`. |
+| Sign-in asks for a code I cannot produce | The authenticator is lost or was reset. Ask a super admin to use **Reset 2FA** on your account, then sign in with your password. |
+| "That code has already been used" | Each code is single-use. Wait for the next 30-second code. |
 
 ## 7. Where things live
 

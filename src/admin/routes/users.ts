@@ -26,6 +26,7 @@ const OK: Record<string, string> = {
   revoked: "Role removed.",
   approved: "Role approved.",
   rejected: "Role rejected.",
+  "2fa": "Two-factor authentication reset.",
 };
 const ERR: Record<string, string> = {
   self: "You cannot do that to your own account.",
@@ -43,6 +44,7 @@ type Target = {
   phone: string | null;
   account_status: string;
   created_at: Date;
+  totp_enabled_at: Date | null;
   roles: { role: string; status: string }[];
 };
 
@@ -61,7 +63,7 @@ const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 async function loadTarget(id: string): Promise<Target | null> {
   if (!/^\d{1,18}$/.test(id)) return null;
   const { rows } = await query<Target>(
-    `SELECT u.user_id, u.name, u.email, u.phone, u.account_status, u.created_at,
+    `SELECT u.user_id, u.name, u.email, u.phone, u.account_status, u.created_at, u.totp_enabled_at,
             COALESCE(json_agg(json_build_object('role', r.role_name, 'status', ur.approval_status)
                               ORDER BY r.role_name) FILTER (WHERE r.role_id IS NOT NULL), '[]'::json) AS roles
      FROM app_user u
@@ -387,5 +389,23 @@ usersRouter.post(
       await logAction(c, req.user?.user_id ?? "", "user.reset_link_created", "app_user", target.user_id, req.ip);
     });
     await renderDetail(req, res, target.user_id, `${req.protocol}://${req.get("host") ?? "localhost:3000"}/admin/reset/${token}`);
+  }),
+);
+
+// Clear two-factor authentication after a lost authenticator. Super admins only for admin accounts.
+usersRouter.post(
+  "/:id/2fa-reset",
+  wrap(async (req, res) => {
+    const target = await guarded(req, res, "admin");
+    if (!target) return;
+    await withTransaction(async (c) => {
+      await c.query(
+        `UPDATE app_user SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL
+         WHERE user_id = $1`,
+        [target.user_id],
+      );
+      await logAction(c, req.user?.user_id ?? "", "user.2fa_reset", "app_user", target.user_id, req.ip);
+    });
+    back(res, target.user_id, "ok", "2fa");
   }),
 );

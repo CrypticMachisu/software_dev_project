@@ -1,0 +1,67 @@
+<%- include('partials/header') %>
+<% const enabled = !!row.totp_enabled_at; %>
+<% if (msg) { %><div class="alert alert-success py-2"><%= msg %></div><% } %>
+<% if (error) { %><div class="alert alert-danger py-2"><%= error %></div><% } %>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-body">
+      <h2 class="h6">Status</h2>
+      <p class="mb-2">
+        <% if (enabled) { %>
+          <span class="badge text-bg-success">Enabled</span>
+          <span class="text-muted small">since <%= fmtDate(row.totp_enabled_at) %></span>
+        <% } else if (row.totp_secret) { %>
+          <span class="badge text-bg-warning">Awaiting confirmation</span>
+        <% } else { %>
+          <span class="badge text-bg-secondary">Not enabled</span>
+        <% } %>
+      </p>
+      <p class="small text-muted mb-0">
+        Two-factor authentication adds a 6-digit code from an authenticator app to this
+        account's sign-in. It is optional, and it can be reset by a super admin if the
+        authenticator is lost.
+      </p>
+    </div></div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-body">
+      <% if (enabled) { %>
+        <h2 class="h6">Turn off</h2>
+        <p class="small text-muted">Enter a current code to confirm. <strong>Your account will be protected by its password alone.</strong></p>
+        <form method="post" action="/admin/security/disable" class="d-flex gap-2" style="max-width: 320px">
+          <input class="form-control" name="code" inputmode="numeric" autocomplete="one-time-code"
+                 pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123 456" required>
+          <button class="btn btn-outline-danger text-nowrap">Turn off</button>
+        </form>
+      <% } else if (row.totp_secret) { %>
+        <h2 class="h6">Confirm your authenticator</h2>
+        <p class="small text-muted mb-2">Add this key to your authenticator app, then enter the code it shows.</p>
+        <p class="mb-2"><code id="totp-secret" class="fs-6"><%= secret %></code></p>
+        <p class="small mb-3"><a href="<%= uri %>">Open in your authenticator app</a></p>
+        <form method="post" action="/admin/security/enable" class="d-flex gap-2" style="max-width: 320px">
+          <input class="form-control" name="code" inputmode="numeric" autocomplete="one-time-code"
+                 pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123 456" required autofocus>
+          <button class="btn btn-success text-nowrap">Confirm</button>
+        </form>
+      <% } else { %>
+        <h2 class="h6">Turn on</h2>
+        <p class="small text-muted">You will be shown a setup key to add to Google Authenticator, Authy, 1Password or any TOTP app.</p>
+        <form method="post" action="/admin/security/setup">
+          <button class="btn btn-success">Set up two-factor authentication</button>
+        </form>
+      <% } %>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mt-3"><div class="card-body">
+  <h2 class="h6">Important</h2>
+  <ul class="small text-muted mb-0">
+    <li>This applies to the <strong>admin panel</strong> sign-in. Storefront accounts keep their normal sign-in.</li>
+    <li>If you lose the authenticator, a super admin can reset this from <em>Users</em> — you will be able to sign in with your password and set it up again.</li>
+    <li>The setup key is shown once, on this page. Do not share it.</li>
+  </ul>
+</div></div>
+<%- include('partials/footer') %>

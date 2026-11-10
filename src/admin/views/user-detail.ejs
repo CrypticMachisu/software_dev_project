@@ -26,6 +26,7 @@
       <dt class="col-sm-4">Phone</dt><dd class="col-sm-8"><%= target.phone || '—' %></dd>
       <dt class="col-sm-4">Status</dt><dd class="col-sm-8"><span class="badge text-bg-<%= badge[target.account_status] || 'secondary' %>"><%= target.account_status %></span></dd>
       <dt class="col-sm-4">Joined</dt><dd class="col-sm-8"><%= fmtDate(target.created_at) %></dd>
+      <dt class="col-sm-4">Two-factor</dt><dd class="col-sm-8"><% if (target.totp_enabled_at) { %>on since <%= fmtDate(target.totp_enabled_at) %><% } else { %>off<% } %></dd>
     </dl>
   </div></div></div>
 
@@ -46,6 +47,10 @@
         <% } %>
         <form method="post" action="/admin/users/<%= target.user_id %>/reset-link" data-confirm="Create a new reset link? Any earlier unused link stops working.">
           <button class="btn btn-outline-secondary btn-sm">Reset password</button></form>
+        <% if (target.totp_enabled_at) { %>
+        <form method="post" action="/admin/users/<%= target.user_id %>/2fa-reset" data-confirm="Turn off two-factor authentication for this account? Only do this if the authenticator was lost.">
+          <button class="btn btn-outline-warning btn-sm">Reset 2FA</button></form>
+        <% } %>
       </div>
       <% if (isSelf) { %><p class="text-muted small mt-2 mb-0">You cannot suspend your own account.</p><% } %>
     <% } %>
