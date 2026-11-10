@@ -1,7 +1,7 @@
 import http from "node:http";
 import path from "node:path";
 import fs from "node:fs";
-import { api } from "./api/index.js";
+import { api, expireStaleOrders } from "./api/index.js";
 import { adminApp } from "./admin/app.js";
 import { pool } from "./db.js";
 import { env } from "./env.js";
@@ -98,6 +98,10 @@ if (process.env.NODE_ENV !== "production") {
       "Set NODE_ENV=production when the app is served over HTTPS.",
   );
 }
+
+// Abandoned checkouts never hold stock, but they should not pile up either.
+void expireStaleOrders();
+setInterval(() => void expireStaleOrders(), 5 * 60 * 1000).unref();
 
 server.listen(port, () => {
   console.log(`listening on http://127.0.0.1:${port}`);

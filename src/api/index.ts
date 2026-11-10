@@ -937,6 +937,51 @@ async function startMpesaPayment(req: Request, res: Response, orderId: string): 
   }
 }
 
+/**
+ * Housekeeping for abandoned checkouts. Nothing is reserved until payment, so an unpaid
+ * order is just noise — but an open STK prompt may still be answered, so it is closed first.
+ */
+const ORDER_TTL_MINUTES = 30;
+const STK_TTL_MINUTES = 15;
+
+export async function expireStaleOrders(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // A prompt nobody answered (or a push that never reached Safaricom) is dead by now.
+    await client.query(
+      `UPDATE payment SET status = 'cancelled', updated_at = now()
+       WHERE status IN ('created','requires_action')
+         AND created_at < now() - make_interval(mins => $1)`,
+      [STK_TTL_MINUTES],
+    );
+    const stale = await client.query<{ order_id: string }>(
+      `UPDATE market_order mo SET order_status = 'cancelled'
+       WHERE mo.order_status = 'pending'
+         AND mo.ordered_at < now() - make_interval(mins => $1)
+         AND NOT EXISTS (SELECT 1 FROM payment p
+                         WHERE p.order_id = mo.order_id
+                           AND p.status IN ('created','requires_action'))
+       RETURNING mo.order_id`,
+      [ORDER_TTL_MINUTES],
+    );
+    if (stale.rows.length) {
+      await client.query(
+        `UPDATE seller_order SET fulfillment_status = 'cancelled'
+         WHERE order_id = ANY($1) AND fulfillment_status = 'pending'`,
+        [stale.rows.map(r => r.order_id)],
+      );
+    }
+    await client.query("COMMIT");
+    if (stale.rows.length) console.log(`expired ${stale.rows.length} unpaid order(s)`);
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("stale order sweep failed", e);
+  } finally {
+    client.release();
+  }
+}
+
 /** Payment entry point: the configured provider decides what happens next. */
 api.post("/order/:id/pay", asyncWrap(async (req, res) => {
   const id = await assertBuyerOrder(req, res);
@@ -1348,6 +1393,19 @@ api.post("/seller-orders/:id/status", asyncWrap(async (req, res) => {
         await client.query("ROLLBACK");
         return null;
       }
+      // A finished sale is money the seller can be paid for: confirm the split and queue it.
+      if (flow.to === "completed") {
+        await client.query(
+          `UPDATE payment_allocation SET status = 'confirmed'
+           WHERE seller_order_id = $1 AND status = 'planned'`,
+          [ctx.soId],
+        );
+        await client.query(
+          `UPDATE seller_order SET release_status = 'eligible'
+           WHERE seller_order_id = $1 AND release_status = 'not_eligible'`,
+          [ctx.soId],
+        );
+      }
       await rollUpOrderStatus(client, updated.rows[0].order_id);
       await client.query("COMMIT");
       return updated.rows[0].order_id;
@@ -1370,7 +1428,9 @@ api.post("/seller-orders/:id/refund", asyncWrap(async (req, res) => {
   const { rows } = await q<{ fulfillment_status: string; release_status: string }>(
     `SELECT fulfillment_status, release_status FROM seller_order WHERE seller_order_id = $1`, [ctx.soId]);
   if (rows[0]?.fulfillment_status !== "completed") return void fail(res, 409, "Only completed orders can be refunded.");
-  if (rows[0].release_status !== "not_eligible") return void fail(res, 409, "A refund was already requested.");
+  if (["requested", "released", "reversed"].includes(rows[0].release_status)) {
+    return void fail(res, 409, "A refund was already requested for this order.");
+  }
   await q(`UPDATE seller_order SET release_status='requested', updated_at=now() WHERE seller_order_id = $1`, [ctx.soId]);
   res.json({ ok: true });
 }));

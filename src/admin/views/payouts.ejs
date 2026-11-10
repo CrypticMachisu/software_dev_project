@@ -1,0 +1,51 @@
+<%- include('partials/header') %>
+<%- include('partials/page-tools') %>
+<% const badge = { eligible: 'warning', held: 'secondary', requested: 'danger', released: 'success', reversed: 'dark' }; %>
+<p class="text-muted">
+  Money owed to sellers for finished orders. Pay it in the provider (for M-Pesa that is the
+  Business-to-Customer transfer), then record the reference here.
+</p>
+<form class="row g-2 mb-3" method="get" action="/admin/payouts">
+  <div class="col-md-3">
+    <select class="form-select" name="status" aria-label="Release status">
+      <option value="">Any release status</option>
+      <% statuses.forEach(s => { %><option value="<%= s %>" <%= filter === s ? 'selected' : '' %>><%= s.replace('_', ' ') %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-auto"><button class="btn btn-success">Filter</button> <a class="btn btn-outline-secondary" href="/admin/payouts">Clear</a></div>
+</form>
+
+<div class="card"><div class="card-body">
+<% if (!rows.length) { %><p class="text-muted mb-0">Nothing to pay out.</p><% } else { %>
+<div class="table-responsive"><table class="table align-middle mb-0">
+  <thead><tr><th>Order</th><th>Seller</th><th>Fulfilment</th><th class="text-end">Amount</th><th>Release</th><th>Payout</th><th></th></tr></thead>
+  <tbody>
+  <% rows.forEach(r => { %>
+    <tr>
+      <td>#<%= r.order_id %><div class="text-muted small"><%= r.exchange_method %></div></td>
+      <td><%= r.seller %></td>
+      <td><%= r.fulfillment_status %></td>
+      <td class="text-end"><%= r.currency ? money(r.amount_minor, r.currency) : '-' %></td>
+      <td><span class="badge text-bg-<%= badge[r.release_status] || 'secondary' %>"><%= String(r.release_status).replace('_', ' ') %></span></td>
+      <td>
+        <% if (r.payout_status) { %><%= r.payout_status %><% if (r.payout_ref) { %><div class="text-muted small"><%= r.payout_ref %></div><% } %>
+        <% } else { %><span class="text-muted">-</span><% } %>
+      </td>
+      <td class="text-end">
+        <% if (r.release_status === 'eligible' || r.release_status === 'held') { %>
+        <form class="d-flex gap-2 justify-content-end" method="post" action="/admin/payouts/<%= r.seller_order_id %>/pay" data-confirm="Mark this payout as paid?">
+          <input class="form-control form-control-sm" name="reference" maxlength="120" placeholder="Provider reference" required>
+          <button class="btn btn-success btn-sm">Mark paid</button>
+        </form>
+        <% } else { %>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/orders/<%= r.order_id %>">View order</a>
+        <% } %>
+      </td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table></div>
+<% } %>
+<%- include('partials/pager') %>
+</div></div>
+<%- include('partials/footer') %>

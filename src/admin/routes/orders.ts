@@ -247,6 +247,13 @@ ordersRouter.post(
       ).rows[0];
       if (!alloc) return { kind: "nopayment" as const, orderId: so.order_id };
 
+      // Once the seller has been paid, giving the buyer money back is a human decision
+      // (the seller may have to return it first), not something this button should imply.
+      const paidOut = (
+        await c.query(`SELECT 1 FROM payout WHERE seller_order_id = $1 AND status = 'paid'`, [soid])
+      ).rows;
+      if (paidOut.length) return { kind: "paidout" as const, orderId: so.order_id };
+
       const existing = (
         await c.query(
           `SELECT 1 FROM refund WHERE seller_order_id = $1 AND status IN ('requested','pending','succeeded')`,
@@ -308,6 +315,9 @@ ordersRouter.post(
     }
     if (outcome.kind === "duplicate") {
       return flash(res, `/admin/orders/${outcome.orderId}`, "err", "A refund is already recorded for this seller order.");
+    }
+    if (outcome.kind === "paidout") {
+      return flash(res, `/admin/orders/${outcome.orderId}`, "err", "This seller was already paid out; reverse the payout before refunding the buyer.");
     }
     flash(res, `/admin/orders/${outcome.orderId}`, "msg",
       `Refund recorded (${outcome.paymentStatus}). Reverse the money in the provider dashboard.`);
