@@ -176,18 +176,33 @@ const fails = new Map<string, { n: number; until: number }>();
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
 
-async function startSession(res: Response, userId: string): Promise<void> {
+/** Anything that can run a statement: the pool, or a transaction client. */
+type Runner = (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
+
+/** Creates the session row and returns the raw token for the sid cookie. */
+async function createSession(
+  userId: string,
+  run: Runner = (text, params) => q(text, params),
+): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
-  await q(
+  await run(
     `INSERT INTO auth_session (user_id, refresh_token_hash, expires_at)
      VALUES ($1, $2, now() + make_interval(mins => $3))`,
     [userId, hashToken(token), IDLE_MINUTES],
   );
+  return token;
+}
+
+function sendSessionCookie(res: Response, token: string): void {
   res.cookie("sid", token, {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
   });
+}
+
+async function startSession(res: Response, userId: string): Promise<void> {
+  sendSessionCookie(res, await createSession(userId));
 }
 
 const loadUser = async (userId: string): Promise<ApiUser> => {
@@ -245,16 +260,40 @@ api.post("/auth/register", asyncWrap(async (req, res) => {
   const exists = await q(`SELECT 1 FROM app_user WHERE lower(email) = $1`, [email]);
   if (exists.rows.length) return void fail(res, 409, "That email is already registered.");
 
-  const { rows } = await q<{ user_id: string }>(
-    `INSERT INTO app_user (name, email, password_hash) VALUES ($1, $2, $3) RETURNING user_id`,
-    [name, email, await bcrypt.hash(password, 12)],
-  );
-  const userId = rows[0].user_id;
-  await q(
-    `INSERT INTO user_role (user_id, role_id) SELECT $1, role_id FROM app_role WHERE role_name = 'buyer'`,
-    [userId],
-  );
-  await startSession(res, userId);
+  // The account, its buyer role and the first session are written in one
+  // transaction: a failure can never leave a half-registered user behind.
+  const passwordHash = await bcrypt.hash(password, 12);
+  const client = await pool.connect();
+  let userId = "";
+  let token = "";
+  try {
+    await client.query("BEGIN");
+    // The unique index on lower(email) is the authoritative check; a signup that
+    // slipped past the query above while this one runs lands here as "no row".
+    const created = await client.query<{ user_id: string }>(
+      `INSERT INTO app_user (name, email, password_hash) VALUES ($1, $2, $3)
+       ON CONFLICT DO NOTHING RETURNING user_id`,
+      [name, email, passwordHash],
+    );
+    if (!created.rows.length) {
+      await client.query("ROLLBACK");
+      return void fail(res, 409, "That email is already registered.");
+    }
+    userId = created.rows[0].user_id;
+    const role = await client.query(
+      `INSERT INTO user_role (user_id, role_id) SELECT $1, role_id FROM app_role WHERE role_name = 'buyer'`,
+      [userId],
+    );
+    if (!role.rowCount) throw new Error("app_role is missing the buyer role");
+    token = await createSession(userId, (text, params) => client.query(text, params));
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  sendSessionCookie(res, token);
   res.status(201).json({ user: await loadUser(userId) });
 }));
 
