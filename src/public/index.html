@@ -357,7 +357,8 @@ const full=id=>db.products.find(p=>p.id==id);
 
 class CartItem{constructor(p,q){Object.assign(this,{productId:p.id,sellerId:p.sellerId,titleSnapshot:p.title,unitPriceMinor:p.priceMinor,quantity:q,imageUrl:p.imageUrl??null})}lineTotalMinor(){return this.unitPriceMinor*this.quantity}}
 class Cart{
- constructor(){this.items=store.get("mkt_cart",[]);this.persist()}
+ constructor(){const saved=store.get("mkt_cart",[]); /* localStorage returns plain objects: give them back their CartItem methods */
+  this.items=(Array.isArray(saved)?saved:[]).filter(i=>i&&i.productId!=null).map(i=>Object.assign(Object.create(CartItem.prototype),i));this.persist()}
  persist(){store.set("mkt_cart",this.items)}
  addItem(productId,qty=1){const p=full(productId),it=this.items.find(i=>i.productId==productId);
   if(!p)return; // product went away between renders
