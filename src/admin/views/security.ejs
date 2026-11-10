@@ -31,6 +31,7 @@
         <h2 class="h6">Turn off</h2>
         <p class="small text-muted">Enter a current code to confirm. <strong>Your account will be protected by its password alone.</strong></p>
         <form method="post" action="/admin/security/disable" class="d-flex gap-2" style="max-width: 320px">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
           <input class="form-control" name="code" inputmode="numeric" autocomplete="one-time-code"
                  pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123 456" required>
           <button class="btn btn-outline-danger text-nowrap">Turn off</button>
@@ -41,6 +42,7 @@
         <p class="mb-2"><code id="totp-secret" class="fs-6"><%= secret %></code></p>
         <p class="small mb-3"><a href="<%= uri %>">Open in your authenticator app</a></p>
         <form method="post" action="/admin/security/enable" class="d-flex gap-2" style="max-width: 320px">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
           <input class="form-control" name="code" inputmode="numeric" autocomplete="one-time-code"
                  pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123 456" required autofocus>
           <button class="btn btn-success text-nowrap">Confirm</button>
@@ -49,6 +51,7 @@
         <h2 class="h6">Turn on</h2>
         <p class="small text-muted">You will be shown a setup key to add to Google Authenticator, Authy, 1Password or any TOTP app.</p>
         <form method="post" action="/admin/security/setup">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
           <button class="btn btn-success">Set up two-factor authentication</button>
         </form>
       <% } %>

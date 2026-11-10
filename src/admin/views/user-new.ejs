@@ -2,6 +2,7 @@
 <div class="card" style="max-width: 560px"><div class="card-body">
   <% if (error) { %><div class="alert alert-danger py-2"><%= error %></div><% } %>
   <form method="post" action="/admin/users/new" autocomplete="off">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="mb-3"><label class="form-label" for="name">Full name</label>
       <input class="form-control" id="name" name="name" value="<%= form.name %>" required maxlength="150"></div>
     <div class="mb-3"><label class="form-label" for="email">Email</label>

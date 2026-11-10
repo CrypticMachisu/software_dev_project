@@ -44,6 +44,25 @@ function fail(res: Response, status: number, message: string): void {
   res.status(status).json({ error: message });
 }
 
+/**
+ * Fixed-window counters per key, to blunt signup bots and payment spam. In-memory on
+ * purpose: one process, and a restart clearing the counters is harmless.
+ */
+const buckets = new Map<string, { n: number; reset: number }>();
+function take(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  const b = buckets.get(key) ?? { n: 0, reset: now + windowMs };
+  if (b.reset <= now) {
+    b.n = 0;
+    b.reset = now + windowMs;
+  }
+  b.n += 1;
+  buckets.set(key, b);
+  if (buckets.size > 5000) for (const [k, v] of buckets) if (v.reset <= now) buckets.delete(k);
+  return b.n <= max;
+}
+const clientIp = (req: Request): string => req.ip ?? req.socket.remoteAddress ?? "unknown";
+
 const asyncWrap =
   (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) =>
   (req: Request, res: Response, next: NextFunction): void => {
@@ -272,6 +291,9 @@ api.get("/me", asyncWrap(async (req, res) => {
 }));
 
 api.post("/auth/register", asyncWrap(async (req, res) => {
+  if (!take(`register:${clientIp(req)}`, 20, 15 * 60_000)) {
+    return void fail(res, 429, "Too many accounts were created from this connection. Try again later.");
+  }
   const body = (req.body ?? {}) as Record<string, unknown>;
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -598,33 +620,43 @@ api.post("/checkout", asyncWrap(async (req, res, next) => {
   }
 }));
 
-/** Shape an order + its seller orders for the front end. */
-async function orderView(orderId: string): Promise<Record<string, unknown> | null> {
-  const { rows: o } = await q<{ order_id: string; order_status: string; currency: string;
-    total_amount_minor: string; ordered_at: Date;
-    delivery_name: string | null; delivery_phone: string | null; delivery_street: string | null;
-    delivery_city: string | null; delivery_zip: string | null }>(
+type OrderHead = {
+  order_id: string; order_status: string; currency: string; total_amount_minor: string;
+  ordered_at: Date;
+  delivery_name: string | null; delivery_phone: string | null; delivery_street: string | null;
+  delivery_city: string | null; delivery_zip: string | null;
+};
+
+/**
+ * Shapes one or more orders for the front end in a fixed five queries, not five per order.
+ * Order ids come back in the order they were asked for; unknown ids are dropped.
+ */
+async function orderViews(orderIds: string[]): Promise<Record<string, unknown>[]> {
+  if (!orderIds.length) return [];
+  const heads = (await q<OrderHead>(
     `SELECT order_id, order_status, currency, total_amount_minor, ordered_at,
             delivery_name, delivery_phone, delivery_street, delivery_city, delivery_zip
-     FROM market_order WHERE order_id = $1`, [orderId]);
-  if (!o.length) return null;
-  const head = o[0];
-  const { rows: sos } = await q<{
-    seller_order_id: string; seller_id: string; seller_name: string; method_name: string;
-    fulfillment_status: string; release_status: string; tracking_number: string | null;
+     FROM market_order WHERE order_id = ANY($1)`, [orderIds])).rows;
+  if (!heads.length) return [];
+
+  const sos = (await q<{
+    order_id: string; seller_order_id: string; seller_id: string; seller_name: string;
+    method_name: string; fulfillment_status: string; release_status: string;
+    tracking_number: string | null;
   }>(
-    `SELECT so.seller_order_id, so.seller_id, u.name AS seller_name, m.name AS method_name,
-            so.fulfillment_status, so.release_status, so.tracking_number
+    `SELECT so.order_id, so.seller_order_id, so.seller_id, u.name AS seller_name,
+            m.name AS method_name, so.fulfillment_status, so.release_status, so.tracking_number
      FROM seller_order so
      JOIN app_user u ON u.user_id = so.seller_id
      JOIN exchange_method m ON m.exchange_method_id = so.exchange_method_id
-     WHERE so.order_id = $1 ORDER BY so.seller_order_id`, [orderId]);
+     WHERE so.order_id = ANY($1) ORDER BY so.seller_order_id`, [orderIds])).rows;
+
   const soIds = sos.map(s => s.seller_order_id);
   const items = soIds.length
     ? (await q<{ seller_order_id: string; product_id: string; title: string; quantity: number;
-                 unit_price_minor: string; line_total_minor: string; order_item_id: string }>(
+                 unit_price_minor: string; line_total_minor: string }>(
         `SELECT soi.seller_order_id, oi.product_id, oi.product_title_snapshot AS title, oi.quantity,
-                oi.unit_price_minor, oi.line_total_minor, oi.order_item_id
+                oi.unit_price_minor, oi.line_total_minor
          FROM seller_order_item soi JOIN order_item oi USING(order_item_id)
          WHERE soi.seller_order_id = ANY($1)`, [soIds])).rows
     : [];
@@ -632,57 +664,101 @@ async function orderView(orderId: string): Promise<Record<string, unknown> | nul
     ? (await q<{ seller_order_id: string }>(`SELECT seller_order_id FROM review WHERE seller_order_id = ANY($1)`,
         [soIds])).rows
     : [];
-  const reviewed = new Set(reviews.map(r => r.seller_order_id));
-  const sellerOrders = sos.map(s => ({
-    id: s.seller_order_id,
-    sellerId: s.seller_id,
-    sellerName: s.seller_name,
-    method: s.method_name,
-    fulfillment: s.fulfillment_status,
-    release: s.release_status,
-    tracking: s.tracking_number ?? "",
-    reviewed: reviewed.has(s.seller_order_id),
-    items: (items || []).filter(i => i.seller_order_id === s.seller_order_id).map(i => ({
-      productId: i.product_id, title: i.title, qty: i.quantity,
-      unitMinor: Number(i.unit_price_minor), lineMinor: Number(i.line_total_minor),
-    })),
-  }));
   // Payment state comes from the payment rows, never from the order status: checkouts that
   // were confirmed before a provider existed have no payment, and calling those "captured" lies.
-  const { rows: pays } = await q<{ status: string; provider_receipt: string | null; amount_minor: string }>(
-    `SELECT status, provider_receipt, amount_minor FROM payment
-     WHERE order_id = $1 ORDER BY created_at DESC, payment_id DESC`, [orderId]);
-  const settled = pays.find(p => ["captured", "partially_refunded", "refunded"].includes(p.status));
-  const waiting = pays.find(p => p.status === "created" || p.status === "requires_action");
-  const payment = settled ? settled.status : waiting ? "pending" : "none";
-  return {
-    id: head.order_id,
-    status: head.order_status,
-    payment,
-    paidMinor: settled ? Number(settled.amount_minor) : 0,
-    receipt: settled?.provider_receipt ?? null,
-    currency: head.currency,
-    totalMinor: Number(head.total_amount_minor),
-    orderedAt: head.ordered_at,
-    delivery: {
-      name: head.delivery_name ?? "",
-      phone: head.delivery_phone ?? "",
-      street: head.delivery_street ?? "",
-      city: head.delivery_city ?? "",
-      zip: head.delivery_zip ?? "",
-    },
-    sellerOrders,
-  };
+  const pays = (await q<{ order_id: string; status: string; provider_receipt: string | null;
+                          amount_minor: string }>(
+    `SELECT order_id, status, provider_receipt, amount_minor FROM payment
+     WHERE order_id = ANY($1) ORDER BY created_at DESC, payment_id DESC`, [orderIds])).rows;
+
+  const reviewed = new Set(reviews.map(r => r.seller_order_id));
+  const itemsBySellerOrder = new Map<string, typeof items>();
+  for (const i of items) {
+    const list = itemsBySellerOrder.get(i.seller_order_id) ?? [];
+    list.push(i);
+    itemsBySellerOrder.set(i.seller_order_id, list);
+  }
+  const sosByOrder = new Map<string, typeof sos>();
+  for (const s of sos) {
+    const list = sosByOrder.get(s.order_id) ?? [];
+    list.push(s);
+    sosByOrder.set(s.order_id, list);
+  }
+  const paysByOrder = new Map<string, typeof pays>();
+  for (const p of pays) {
+    const list = paysByOrder.get(p.order_id) ?? [];
+    list.push(p);
+    paysByOrder.set(p.order_id, list);
+  }
+
+  const headsById = new Map(heads.map(h => [h.order_id, h]));
+  return orderIds.flatMap((id) => {
+    const head = headsById.get(id);
+    if (!head) return [];
+    const sellerOrders = (sosByOrder.get(id) ?? []).map(s => ({
+      id: s.seller_order_id,
+      sellerId: s.seller_id,
+      sellerName: s.seller_name,
+      method: s.method_name,
+      fulfillment: s.fulfillment_status,
+      release: s.release_status,
+      tracking: s.tracking_number ?? "",
+      reviewed: reviewed.has(s.seller_order_id),
+      items: (itemsBySellerOrder.get(s.seller_order_id) ?? []).map(i => ({
+        productId: i.product_id, title: i.title, qty: i.quantity,
+        unitMinor: Number(i.unit_price_minor), lineMinor: Number(i.line_total_minor),
+      })),
+    }));
+    const orderPays = paysByOrder.get(id) ?? [];
+    const settled = orderPays.find(p => ["captured", "partially_refunded", "refunded"].includes(p.status));
+    const waiting = orderPays.find(p => p.status === "created" || p.status === "requires_action");
+    return [{
+      id: head.order_id,
+      status: head.order_status,
+      payment: settled ? settled.status : waiting ? "pending" : "none",
+      paidMinor: settled ? Number(settled.amount_minor) : 0,
+      receipt: settled?.provider_receipt ?? null,
+      currency: head.currency,
+      totalMinor: Number(head.total_amount_minor),
+      orderedAt: head.ordered_at,
+      delivery: {
+        name: head.delivery_name ?? "",
+        phone: head.delivery_phone ?? "",
+        street: head.delivery_street ?? "",
+        city: head.delivery_city ?? "",
+        zip: head.delivery_zip ?? "",
+      },
+      sellerOrders,
+    }];
+  });
 }
+
+async function orderView(orderId: string): Promise<Record<string, unknown> | null> {
+  return (await orderViews([orderId]))[0] ?? null;
+}
+
+/** Newest first; paged so a long order history cannot turn into one huge response. */
+const ORDERS_PAGE_MAX = 200;
 
 api.get("/orders", asyncWrap(async (req, res) => {
   const user = await requireUser(req, res);
   if (!user) return;
-  const { rows } = await q<{ order_id: string }>(
-    `SELECT order_id FROM market_order
-     WHERE buyer_id = $1 ORDER BY order_id DESC`, [user.user_id]);
-  const orders = (await Promise.all(rows.map(r => orderView(r.order_id)))).filter(Boolean);
-  res.json({ orders });
+  const askedLimit = Number.parseInt(String(req.query.limit ?? ""), 10);
+  const askedOffset = Number.parseInt(String(req.query.offset ?? ""), 10);
+  const limit = Number.isFinite(askedLimit) && askedLimit > 0 ? Math.min(askedLimit, ORDERS_PAGE_MAX) : 50;
+  const offset = Number.isFinite(askedOffset) && askedOffset > 0 ? askedOffset : 0;
+  const [rows, total] = await Promise.all([
+    q<{ order_id: string }>(
+      `SELECT order_id FROM market_order
+       WHERE buyer_id = $1 ORDER BY order_id DESC LIMIT $2 OFFSET $3`, [user.user_id, limit, offset]),
+    q<{ n: string }>(`SELECT count(*)::text AS n FROM market_order WHERE buyer_id = $1`, [user.user_id]),
+  ]);
+  res.json({
+    orders: await orderViews(rows.rows.map(r => r.order_id)),
+    total: Number(total.rows[0]?.n ?? 0),
+    limit,
+    offset,
+  });
 }));
 
 api.get("/order/:id", asyncWrap(async (req, res) => {
@@ -984,6 +1060,9 @@ export async function expireStaleOrders(): Promise<void> {
 
 /** Payment entry point: the configured provider decides what happens next. */
 api.post("/order/:id/pay", asyncWrap(async (req, res) => {
+  if (!take(`pay:${clientIp(req)}`, 60, 60_000)) {
+    return void fail(res, 429, "Too many payment attempts. Wait a minute and try again.");
+  }
   const id = await assertBuyerOrder(req, res);
   if (!id) return;
   if (PAYMENT_PROVIDER === "mpesa") return void await startMpesaPayment(req, res, id);

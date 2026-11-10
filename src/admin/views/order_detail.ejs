@@ -46,7 +46,8 @@
     <tbody><% so.items.forEach(i => { %><tr><td><%= i.title %></td><td class="text-end"><%= i.quantity %></td><td class="text-end"><%= money(i.unit_price_minor, order.currency) %></td><td class="text-end"><%= money(i.line_total_minor, order.currency) %></td></tr><% }) %></tbody>
   </table></div>
   <% if (so.next.length) { %>
-  <form class="row g-2 align-items-center" method="post" action="/admin/orders/seller-orders/<%= so.seller_order_id %>/status" data-confirm="Update this seller order's status?">
+  <form class="row g-2 align-items-center" method="post" action="/admin/orders/seller-orders/<%= so.seller_order_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/status" data-confirm="Update this seller order's status?">
     <div class="col-auto"><label class="col-form-label" for="s<%= so.seller_order_id %>">Move to</label></div>
     <div class="col-auto">
       <select class="form-select form-select-sm" id="s<%= so.seller_order_id %>" name="status"><% so.next.forEach(n => { %><option value="<%= n %>"><%= n %></option><% }) %></select>
@@ -55,7 +56,8 @@
   </form>
   <% } else { %><p class="text-muted small mb-0">This seller order is final ("<%= so.fulfillment_status %>") and cannot be changed.</p><% } %>
   <% if (so.refundable) { %>
-  <form class="row g-2 align-items-center mt-2" method="post" action="/admin/orders/seller-orders/<%= so.seller_order_id %>/refund" data-confirm="Record a refund for this seller order? The money must be reversed in the provider dashboard separately.">
+  <form class="row g-2 align-items-center mt-2" method="post" action="/admin/orders/seller-orders/<%= so.seller_order_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/refund" data-confirm="Record a refund for this seller order? The money must be reversed in the provider dashboard separately.">
     <div class="col-auto"><input class="form-control form-control-sm" name="reason" maxlength="300" placeholder="Reason (optional)"></div>
     <div class="col-auto"><button class="btn btn-outline-danger btn-sm">Record refund</button></div>
   </form>

@@ -4,6 +4,7 @@
 <h2 class="h6">Exchange methods <span class="text-muted fw-normal small">(how a buyer and seller hand over the goods, e.g. courier or pickup)</span></h2>
 <div class="card mb-4"><div class="card-body">
   <form class="row g-2 mb-3" method="post" action="/admin/exchange">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="col-md-3"><input class="form-control" name="name" maxlength="120" placeholder="Name, e.g. In-person pickup" required aria-label="Name"></div>
     <div class="col-md-6"><input class="form-control" name="description" maxlength="1000" placeholder="Description (optional)" aria-label="Description"></div>
     <div class="col-md-3"><button class="btn btn-success w-100"><svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg> Add method</button></div>
@@ -26,9 +27,11 @@
         <td class="text-end text-nowrap">
           <button class="btn btn-outline-success btn-sm" form="em-<%= m.exchange_method_id %>">Save</button>
           <form class="d-inline" method="post" action="/admin/exchange/<%= m.exchange_method_id %>/toggle" data-confirm="<%= m.method_status === 'active' ? 'Deactivate' : 'Activate' %> '<%= m.name %>'?">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
             <button class="btn btn-outline-secondary btn-sm"><%= m.method_status === 'active' ? 'Deactivate' : 'Activate' %></button>
           </form>
           <form class="d-inline" method="post" action="/admin/exchange/<%= m.exchange_method_id %>/delete" data-confirm="Delete '<%= m.name %>'? This cannot be undone.">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
             <button class="btn btn-outline-danger btn-sm">Delete</button>
           </form>
         </td>
@@ -41,6 +44,7 @@
 <h2 class="h6">Payment providers <span class="text-muted fw-normal small">(turn M-Pesa or other providers on and off; keys stay in the server's .env file)</span></h2>
 <div class="card"><div class="card-body">
   <form class="row g-2 mb-3" method="post" action="/admin/exchange/providers">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="col-md-3"><input class="form-control" name="provider_code" maxlength="40" placeholder="Code, e.g. mpesa" required aria-label="Provider code"></div>
     <div class="col-md-6"><input class="form-control" name="display_name" maxlength="120" placeholder="Display name, e.g. M-Pesa" required aria-label="Display name"></div>
     <div class="col-md-3"><button class="btn btn-success w-100"><svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg> Add provider</button></div>
@@ -56,6 +60,7 @@
         <td class="text-end"><%= p.payments %></td>
         <td class="text-end">
           <form class="d-inline" method="post" action="/admin/exchange/providers/<%= p.payment_provider_id %>/toggle" data-confirm="<%= p.provider_status === 'active' ? 'Deactivate' : 'Activate' %> '<%= p.display_name %>'?">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
             <button class="btn btn-outline-secondary btn-sm"><%= p.provider_status === 'active' ? 'Deactivate' : 'Activate' %></button>
           </form>
         </td>

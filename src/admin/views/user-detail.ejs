@@ -38,17 +38,21 @@
       <div class="d-flex flex-wrap gap-2">
         <% if (!isSelf) { %>
           <% if (target.account_status === 'active') { %>
-            <form method="post" action="/admin/users/<%= target.user_id %>/status" data-confirm="Suspend this account? They will be signed out.">
+            <form method="post" action="/admin/users/<%= target.user_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/status" data-confirm="Suspend this account? They will be signed out.">
               <input type="hidden" name="status" value="suspended"><button class="btn btn-outline-warning btn-sm">Suspend</button></form>
           <% } else { %>
-            <form method="post" action="/admin/users/<%= target.user_id %>/status">
+            <form method="post" action="/admin/users/<%= target.user_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/status">
               <input type="hidden" name="status" value="active"><button class="btn btn-outline-success btn-sm">Reactivate</button></form>
           <% } %>
         <% } %>
-        <form method="post" action="/admin/users/<%= target.user_id %>/reset-link" data-confirm="Create a new reset link? Any earlier unused link stops working.">
+        <form method="post" action="/admin/users/<%= target.user_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/reset-link" data-confirm="Create a new reset link? Any earlier unused link stops working.">
           <button class="btn btn-outline-secondary btn-sm">Reset password</button></form>
         <% if (target.totp_enabled_at) { %>
-        <form method="post" action="/admin/users/<%= target.user_id %>/2fa-reset" data-confirm="Turn off two-factor authentication for this account? Only do this if the authenticator was lost.">
+        <form method="post" action="/admin/users/<%= target.user_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/2fa-reset" data-confirm="Turn off two-factor authentication for this account? Only do this if the authenticator was lost.">
           <button class="btn btn-outline-warning btn-sm">Reset 2FA</button></form>
         <% } %>
       </div>
@@ -71,12 +75,15 @@
           <% if (mayAct) { %>
             <div class="d-inline-flex gap-1">
             <% if (r.status !== 'approved') { %>
-              <form method="post" action="/admin/users/<%= target.user_id %>/approval"><input type="hidden" name="role" value="<%= r.role %>"><input type="hidden" name="decision" value="approved"><button class="btn btn-success btn-sm">Approve</button></form>
+              <form method="post" action="/admin/users/<%= target.user_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/approval"><input type="hidden" name="role" value="<%= r.role %>"><input type="hidden" name="decision" value="approved"><button class="btn btn-success btn-sm">Approve</button></form>
             <% } %>
             <% if (r.status !== 'rejected') { %>
-              <form method="post" action="/admin/users/<%= target.user_id %>/approval"><input type="hidden" name="role" value="<%= r.role %>"><input type="hidden" name="decision" value="rejected"><button class="btn btn-outline-danger btn-sm">Reject</button></form>
+              <form method="post" action="/admin/users/<%= target.user_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/approval"><input type="hidden" name="role" value="<%= r.role %>"><input type="hidden" name="decision" value="rejected"><button class="btn btn-outline-danger btn-sm">Reject</button></form>
             <% } %>
-              <form method="post" action="/admin/users/<%= target.user_id %>/roles/remove" data-confirm="Remove the <%= r.role %> role?"><input type="hidden" name="role" value="<%= r.role %>"><button class="btn btn-outline-secondary btn-sm">Remove</button></form>
+              <form method="post" action="/admin/users/<%= target.user_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/roles/remove" data-confirm="Remove the <%= r.role %> role?"><input type="hidden" name="role" value="<%= r.role %>"><button class="btn btn-outline-secondary btn-sm">Remove</button></form>
             </div>
           <% } %>
         </td>
@@ -88,7 +95,8 @@
 
   <% if (canManage) { const addable = ROLES.filter(r => !held.includes(r) && (canPrivileged || !priv(r))); %>
     <% if (addable.length) { %>
-    <form method="post" action="/admin/users/<%= target.user_id %>/roles" class="d-flex gap-2 mt-2" style="max-width: 360px">
+    <form method="post" action="/admin/users/<%= target.user_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/roles" class="d-flex gap-2 mt-2" style="max-width: 360px">
       <select class="form-select form-select-sm" name="role" aria-label="Role to grant">
         <% addable.forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
       </select>

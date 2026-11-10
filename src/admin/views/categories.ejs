@@ -4,6 +4,7 @@
 <div class="card mb-3"><div class="card-body">
   <h2 class="h6">Add category</h2>
   <form class="row g-2" method="post" action="/admin/products/categories">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="col-md-4"><input class="form-control" name="name" maxlength="120" placeholder="Name" required></div>
     <div class="col-md-6"><input class="form-control" name="description" maxlength="1000" placeholder="Description (optional)"></div>
     <div class="col-md-2"><button class="btn btn-success w-100">Add</button></div>
@@ -27,6 +28,7 @@
       <td class="text-end text-nowrap">
         <button class="btn btn-outline-success btn-sm" form="edit-<%= c.category_id %>">Save</button>
         <form class="d-inline" method="post" action="/admin/products/categories/<%= c.category_id %>/delete" data-confirm="Delete the category '<%= c.name %>'?">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
           <button class="btn btn-outline-danger btn-sm">Delete</button>
         </form>
       </td>

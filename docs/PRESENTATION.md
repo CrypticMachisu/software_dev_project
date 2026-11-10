@@ -55,9 +55,9 @@ Point out the company header, period, generation time and the 500-row cap.
 ## Slide 8 — Security (75s)
 
 Hashing with bcrypt, parameterised SQL everywhere, role checks on every admin route, sessions
-revoked on suspension and password reset, audit log for privileged changes, and optional TOTP
-two-factor on the admin login. Mention the known limits honestly: no CSRF tokens, in-memory login
-lockout, no email delivery.
+revoked on suspension and password reset, audit log for privileged changes, CSRF tokens on every
+admin form, rate limits on signup and payments, and optional TOTP two-factor on the admin login.
+Mention the known limits honestly: counters are per-process, and there is no email delivery.
 
 ## Slide 9 — Testing and documentation (60s)
 
@@ -68,8 +68,8 @@ refunds; `scripts/check-contrast.mjs` checks the palette. Documentation: `README
 
 ## Slide 10 — What I would do next (45s)
 
-Email delivery for resets and notifications, CSRF tokens, pagination and query batching for
-`/api/orders`, and a provider-backed payout API instead of a recorded reference.
+Email delivery for resets and notifications, a shared rate-limit store so counters survive a
+restart, and a provider-backed payout API instead of a recorded reference.
 
 ## Likely questions
 

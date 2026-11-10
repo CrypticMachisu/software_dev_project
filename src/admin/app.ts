@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { env } from "../env.js";
 import "./types.js";
 import { requireAdmin, requireRole } from "./auth.js";
+import { csrfProtection } from "./csrf.js";
 import { auditRouter } from "./routes/audit.js";
 import { authRouter } from "./routes/auth.js";
 import { dashboardRouter } from "./routes/dashboard.js";
@@ -48,6 +49,8 @@ adminApp.use(
 );
 adminApp.use(express.urlencoded({ extended: false }));
 adminApp.use(cookieParser());
+// Rejects any state-changing request whose form did not carry this session's token.
+adminApp.use(csrfProtection);
 adminApp.use("/admin/static", express.static(path.resolve(process.cwd(), "src", "admin", "public")));
 
 // Display helpers available in every view

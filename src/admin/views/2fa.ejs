@@ -9,6 +9,7 @@
 </head>
 <body class="login-page">
 <form method="post" action="/admin/2fa" class="login-card">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
   <div class="mb-3"><div class="login-brand">M-DUKA</div><div class="text-muted">Two-factor check</div></div>
   <% if (error) { %><div class="alert alert-danger py-2"><%= error %></div><% } %>
   <p class="small text-muted">Enter the 6-digit code from your authenticator app.</p>

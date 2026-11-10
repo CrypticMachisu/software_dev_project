@@ -33,7 +33,8 @@
       </td>
       <td class="text-end">
         <% if (r.release_status === 'eligible' || r.release_status === 'held') { %>
-        <form class="d-flex gap-2 justify-content-end" method="post" action="/admin/payouts/<%= r.seller_order_id %>/pay" data-confirm="Mark this payout as paid?">
+        <form class="d-flex gap-2 justify-content-end" method="post" action="/admin/payouts/<%= r.seller_order_id %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/pay" data-confirm="Mark this payout as paid?">
           <input class="form-control form-control-sm" name="reference" maxlength="120" placeholder="Provider reference" required>
           <button class="btn btn-success btn-sm">Mark paid</button>
         </form>

@@ -202,9 +202,10 @@ not used by the application.
 
 - The storefront loads the catalogue once and filters in the browser; `/api/products`
   supports server-side `q`, `category`, `min` and `max`, which the UI does not call yet.
-- `GET /api/orders` runs a handful of queries per order and is not paginated.
+- `GET /api/orders` returns the newest 50 orders by default (`limit`/`offset` up to 200).
 - No email or notification delivery: password resets are issued as links by an admin.
-- Login lockouts are in-memory, so they reset on restart and are per process.
+- Login lockouts and the signup/payment rate limits are in-memory, so they reset on restart and
+  are per process.
 - One currency per deployment is assumed for display; `/seller/stats` sums line totals
   without grouping by currency.
 - Listings with zero stock stay `active` and read as "Sold out" rather than flipping to `sold`.

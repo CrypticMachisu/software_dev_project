@@ -6,7 +6,8 @@
 
 <div class="row g-3">
   <div class="col-lg-7"><div class="card"><div class="card-body">
-    <form method="post" action="<%= productId ? '/admin/products/' + productId + '/edit' : '/admin/products/new' %>" novalidate>
+    <form method="post" action="<%= productId ? '/admin/products/' + productId + '/edit' : '/admin/products/new' %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">" novalidate>
       <% if (productId) { %>
         <div class="mb-3"><label class="form-label">Seller</label><input class="form-control" value="<%= sellerName %>" disabled></div>
       <% } else { %>
@@ -48,7 +49,8 @@
   <div class="col-lg-5"><div class="card"><div class="card-body">
     <h2 class="h6">Moderation</h2>
     <p class="mb-3">Current status: <span class="badge text-bg-<%= badge[listingStatus] || 'secondary' %>"><%= listingStatus %></span></p>
-    <form method="post" action="/admin/products/<%= productId %>/status" data-confirm="Change the status of this listing?">
+    <form method="post" action="/admin/products/<%= productId %>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">/status" data-confirm="Change the status of this listing?">
       <div class="mb-3">
         <label class="form-label" for="status">Set status</label>
         <select class="form-select" id="status" name="status">

@@ -18,6 +18,7 @@
   <% } else { %>
     <% if (error) { %><div class="alert alert-danger py-2"><%= error %></div><% } %>
     <form method="post" autocomplete="off">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
       <div class="mb-3"><label class="form-label" for="password">New password</label>
         <input class="form-control" id="password" name="password" type="password" required minlength="10" autofocus autocomplete="new-password">
         <div class="form-text">At least 10 characters.</div></div>
