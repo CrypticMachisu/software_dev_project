@@ -180,7 +180,9 @@ test runner; runs are pointed at a scratch database, never at demo data.
 
 `README.md` (this file) explains the architecture and the money model, `INSTALL.md` covers
 setup, M-Pesa and the Docker image, `docs/USER_MANUAL.md` walks through the storefront, seller
-and admin flows, and `docs/PRESENTATION.md` is the demo script for the final presentation. The admin panel also has a built-in **Help** page at `/admin/help`, and **Reports** at
+and admin flows, and `docs/PRESENTATION.md` is the three-speaker runbook, script and database
+reference for the final presentation. The admin panel also has a built-in **Help** page at
+`/admin/help`, and **Reports** at
 `/admin/reports` produces a printable sales report with company header, period, filters,
 sorting and generation time.
 
