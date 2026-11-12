@@ -6,6 +6,10 @@ app = "software-dev-project"
 [build]
   dockerfile = "Dockerfile"
 
+[deploy]
+  # Runs once per deploy before machines are updated; a failed migration aborts the release.
+  release_command = "node dist/src/migrate.js"
+
 [env]
   NODE_ENV = "production"
   PORT = "3000"
