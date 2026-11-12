@@ -45,6 +45,11 @@ function pruneChallenges(): void {
 /** Creates the real session, logs the sign-in and sends the admin to the dashboard. */
 async function signIn(req: Request, res: Response, userId: string, details: string | null): Promise<void> {
   const token = crypto.randomBytes(32).toString("hex");
+  // One live session per admin account: a stale or shared cookie stops working on re-login.
+  await query(
+    `UPDATE auth_session SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
+    [userId],
+  );
   await query(
     `INSERT INTO auth_session (user_id, refresh_token_hash, expires_at)
      VALUES ($1, $2, now() + make_interval(mins => $3))`,
@@ -59,8 +64,13 @@ async function signIn(req: Request, res: Response, userId: string, details: stri
   res.redirect("/admin");
 }
 
-authRouter.get("/login", (_req, res) => {
-  res.render("login", { error: null });
+authRouter.get("/login", (req, res) => {
+  // A completed reset lands here without the reset token staying in the address bar.
+  const notice = req.query.reset === "done"
+    ? "Your password has been changed and every older session was signed out."
+    : null;
+  res.set("Cache-Control", "no-store");
+  res.render("login", { error: null, notice });
 });
 
 authRouter.post("/login", async (req, res, next) => {
@@ -85,7 +95,7 @@ authRouter.post("/login", async (req, res, next) => {
     }>(
       `SELECT u.user_id, u.password_hash, u.account_status, u.totp_secret, array_agg(r.role_name) AS roles
        FROM app_user u
-       JOIN user_role ur ON ur.user_id = u.user_id
+       JOIN user_role ur ON ur.user_id = u.user_id AND ur.approval_status = 'approved'
        JOIN app_role r   ON r.role_id  = ur.role_id
        WHERE lower(u.email) = lower($1)
        GROUP BY u.user_id`,

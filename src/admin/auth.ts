@@ -24,7 +24,8 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     }>(
       `SELECT u.user_id, u.name, s.expires_at,
          (SELECT array_agg(r.role_name) FROM user_role ur
-            JOIN app_role r ON r.role_id = ur.role_id WHERE ur.user_id = u.user_id) AS roles
+            JOIN app_role r ON r.role_id = ur.role_id
+           WHERE ur.user_id = u.user_id AND ur.approval_status = 'approved') AS roles
        FROM auth_session s
        JOIN app_user u ON u.user_id = s.user_id
        WHERE s.refresh_token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()

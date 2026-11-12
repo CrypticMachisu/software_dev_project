@@ -17,6 +17,13 @@ import "../admin/types.js"; // Express.Request.user augmentation
 export const api = express();
 
 api.use(cookieParser());
+// Every response is account-specific: never let a browser or shared proxy cache one
+// user's catalogue/session/order payload and replay it to another user via a URL.
+api.use((_req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  res.set("Vary", "Cookie");
+  next();
+});
 api.use(express.json({ limit: "100kb" }));
 // Behind ngrok or any reverse proxy the client address arrives in X-Forwarded-For;
 // without this every audit and login attempt records the proxy's IP instead.
@@ -114,6 +121,9 @@ async function requireUser(req: Request, res: Response): Promise<ApiUser | null>
 }
 
 const hasRole = (u: ApiUser, r: string): boolean => u.roles.includes(r);
+/** Pickup, Pick-up and Pick Up all mean the same thing to buyers. */
+const isPickupMethod = (name: string | null | undefined): boolean =>
+  /\bpick(?:-|\s)?up\b/i.test(name ?? "");
 
 function rowToProduct(row: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -142,6 +152,10 @@ interface CatalogueSnapshot {
   products: Record<string, unknown>[];
   categories: { id: string; name: string }[];
   methods: { id: string; name: string }[];
+  /** seller id -> exchange method ids that seller offers (absent = all active). */
+  sellerMethods: Record<string, number[]>;
+  /** seller id -> pickup point and instructions (absent = not provided). */
+  sellerPickup: Record<string, { location: string; instructions: string }>;
 }
 let catalogueCache: CatalogueSnapshot | null = null;
 let catalogueInFlight: Promise<CatalogueSnapshot> | null = null;
@@ -175,7 +189,7 @@ async function catalogue(): Promise<CatalogueSnapshot> {
 }
 async function loadCatalogue(version: number): Promise<CatalogueSnapshot> {
   const now = Date.now();
-  const [products, categories, methods] = await Promise.all([
+  const [products, categories, methods, sellerMethods, sellerPickup] = await Promise.all([
     q<Record<string, unknown>>(
       `SELECT p.product_id, p.seller_id, u.name AS seller_name, p.category_id, c.name AS category_name,
               p.title, p.description, p.image_url, p.asking_price, p.quantity_available, p.listing_status
@@ -189,12 +203,32 @@ async function loadCatalogue(version: number): Promise<CatalogueSnapshot> {
     q<{ id: string; name: string }>(
       `SELECT exchange_method_id AS id, name FROM exchange_method
        WHERE method_status = 'active' ORDER BY name`),
+    q<{ seller_id: string; exchange_method_id: string }>(
+      `SELECT sem.seller_id, sem.exchange_method_id
+       FROM seller_exchange_method sem
+       JOIN exchange_method m ON m.exchange_method_id = sem.exchange_method_id
+       WHERE m.method_status = 'active'`),
+    q<{ seller_id: string; location: string; instructions: string | null }>(
+      `SELECT seller_id, location, instructions FROM seller_pickup_detail`),
   ]);
+  const methodsBySeller: Record<string, number[]> = {};
+  for (const row of sellerMethods.rows) {
+    (methodsBySeller[String(row.seller_id)] ??= []).push(Number(row.exchange_method_id));
+  }
+  const pickupBySeller: Record<string, { location: string; instructions: string }> = {};
+  for (const row of sellerPickup.rows) {
+    pickupBySeller[String(row.seller_id)] = {
+      location: row.location,
+      instructions: row.instructions ?? "",
+    };
+  }
   const snapshot: CatalogueSnapshot = {
     at: now,
     products: products.rows,
     categories: categories.rows,
     methods: methods.rows,
+    sellerMethods: methodsBySeller,
+    sellerPickup: pickupBySeller,
   };
   // A write that invalidated the cache while this load was running wins.
   if (version === catalogueVersion) catalogueCache = snapshot;
@@ -243,8 +277,33 @@ function sendSessionCookie(res: Response, token: string): void {
   });
 }
 
-async function startSession(res: Response, userId: string): Promise<void> {
-  sendSessionCookie(res, await createSession(userId));
+/**
+ * Starts a fresh session and revokes every older one for this account. An account is
+ * therefore only active in one place at a time: a shared, cached or stolen cookie stops
+ * working the moment the real owner signs in again.
+ */
+async function replaceSession(res: Response, userId: string): Promise<void> {
+  const token = crypto.randomBytes(32).toString("hex");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE auth_session SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
+      [userId],
+    );
+    await client.query(
+      `INSERT INTO auth_session (user_id, refresh_token_hash, expires_at)
+       VALUES ($1, $2, now() + make_interval(mins => $3))`,
+      [userId, hashToken(token), IDLE_MINUTES],
+    );
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  sendSessionCookie(res, token);
 }
 
 const loadUser = async (userId: string): Promise<ApiUser> => {
@@ -373,7 +432,7 @@ api.post("/auth/login", asyncWrap(async (req, res) => {
     return void fail(res, 401, "Email or password is incorrect.");
   }
   fails.delete(key);
-  await startSession(res, u.user_id);
+  await replaceSession(res, u.user_id);
   res.json({ user: await loadUser(u.user_id) });
 }));
 
@@ -416,6 +475,8 @@ api.get("/bootstrap", asyncWrap(async (req, res) => {
     payment: { provider: PAYMENT_PROVIDER, currency: CURRENCY, phoneRequired: PAYMENT_PROVIDER === "mpesa" },
     categories: data.categories,
     methods: data.methods,
+    sellerMethods: data.sellerMethods,
+    sellerPickup: data.sellerPickup,
     products: data.products.map(rowToProduct),
   });
 }));
@@ -487,7 +548,7 @@ api.get("/products/:id", asyncWrap(async (req, res) => {
     const isAdmin = !!viewer?.roles.some(r => r === "admin" || r === "super_admin");
     if (!isOwner && !isAdmin) return void fail(res, 404, "Product not found.");
   }
-  const [reviews, rating] = await Promise.all([
+  const [reviews, rating, methodsForSeller, pickupForSeller] = await Promise.all([
     q<{ rating: number; comment: string; buyer_name: string; created_at: Date }>(
       `SELECT r.rating, r.comment, u.name AS buyer_name, r.created_at
        FROM review r JOIN app_user u ON u.user_id = r.buyer_id
@@ -498,9 +559,33 @@ api.get("/products/:id", asyncWrap(async (req, res) => {
       `SELECT round(avg(rating)::numeric, 1)::text AS rating, count(*)::text AS n FROM review WHERE seller_id = $1`,
       [product.seller_id],
     ),
+    // A seller with no saved choice offers every active method (the old behaviour).
+    q<{ id: string; name: string }>(
+      `WITH configured AS (
+         SELECT sem.exchange_method_id
+         FROM seller_exchange_method sem
+         JOIN exchange_method em ON em.exchange_method_id = sem.exchange_method_id
+         WHERE sem.seller_id = $1 AND em.method_status = 'active'
+       )
+       SELECT m.exchange_method_id AS id, m.name
+       FROM exchange_method m
+       WHERE m.method_status = 'active'
+         AND (NOT EXISTS (SELECT 1 FROM configured)
+              OR m.exchange_method_id IN (SELECT exchange_method_id FROM configured))
+       ORDER BY m.name`,
+      [product.seller_id],
+    ),
+    q<{ location: string; instructions: string | null }>(
+      `SELECT location, instructions FROM seller_pickup_detail WHERE seller_id = $1`,
+      [product.seller_id],
+    ),
   ]);
   res.json({
     product: rowToProduct(product),
+    methods: methodsForSeller.rows,
+    pickup: pickupForSeller.rows[0]
+      ? { location: pickupForSeller.rows[0].location, instructions: pickupForSeller.rows[0].instructions ?? "" }
+      : null,
     sellerRating: rating.rows[0]?.rating ? { avg: Number(rating.rows[0].rating), n: Number(rating.rows[0].n) } : null,
     reviews: reviews.rows.map(r => ({ rating: r.rating, comment: r.comment, buyerName: r.buyer_name, createdAt: r.created_at })),
   });
@@ -538,7 +623,7 @@ api.post("/checkout", asyncWrap(async (req, res, next) => {
     city: text(rawAddr.city, 120),
     zip: text(rawAddr.zip, 20),
   };
-  if (!delivery.name || !delivery.street) return void fail(res, 400, "Delivery name and street are required.");
+  if (!delivery.name) return void fail(res, 400, "Your name is required.");
   const methodBySeller = body.methods ?? {};
 
   const client = await pool.connect();
@@ -546,8 +631,7 @@ api.post("/checkout", asyncWrap(async (req, res, next) => {
     await client.query("BEGIN");
     const sellerIds = new Set<string>();
     let totalMinor = 0;
-    const lines: { productId: string; sellerId: string; title: string; qty: number; unit: number; line: number;
-      methodId: number }[] = [];
+    const lines: { productId: string; sellerId: string; title: string; qty: number; unit: number; line: number }[] = [];
     for (const it of cleanedItems) {
       const pr = await client.query<{
         product_id: string; seller_id: string; title: string; asking_price: string;
@@ -567,20 +651,71 @@ api.post("/checkout", asyncWrap(async (req, res, next) => {
       const line = unit * it.quantity;
       totalMinor += line;
       sellerIds.add(p.seller_id);
-      lines.push({ productId: p.product_id, sellerId: p.seller_id, title: p.title, qty: it.quantity, unit, line,
-        methodId: Number(methodBySeller[p.seller_id]) || 0 });
+      lines.push({ productId: p.product_id, sellerId: p.seller_id, title: p.title, qty: it.quantity, unit, line });
     }
 
-    const fallback = await client.query<{ id: string }>(
-      `SELECT exchange_method_id AS id FROM exchange_method
-       WHERE method_status='active' ORDER BY exchange_method_id LIMIT 1`);
-    const fallbackMethod = Number(fallback.rows[0]?.id ?? 1);
+    // A seller can restrict checkout to pickup, delivery, or both. A seller with no
+    // saved choice offers every active method, which keeps existing accounts working.
+    const activeMethods = await client.query<{ id: string; name: string }>(
+      `SELECT exchange_method_id AS id, name FROM exchange_method
+       WHERE method_status='active' ORDER BY exchange_method_id`);
+    const activeMethodIds = activeMethods.rows.map(r => String(r.id));
+    const methodNameById = new Map(activeMethods.rows.map(r => [String(r.id), r.name]));
+    if (!activeMethodIds.length) {
+      await client.query("ROLLBACK");
+      return void fail(res, 409, "No exchange methods are available right now.");
+    }
+    const configured = await client.query<{ seller_id: string; exchange_method_id: string }>(
+      `SELECT seller_id, exchange_method_id FROM seller_exchange_method
+       WHERE seller_id = ANY($1)`, [[...sellerIds]]);
+    const configuredBySeller = new Map<string, string[]>();
+    for (const row of configured.rows) {
+      const list = configuredBySeller.get(String(row.seller_id)) ?? [];
+      list.push(String(row.exchange_method_id));
+      configuredBySeller.set(String(row.seller_id), list);
+    }
+    const sellerNames = await client.query<{ user_id: string; name: string }>(
+      `SELECT user_id, name FROM app_user WHERE user_id = ANY($1)`, [[...sellerIds]]);
+    const sellerNameById = new Map(sellerNames.rows.map(r => [String(r.user_id), r.name]));
+
+    const chosenBySeller = new Map<string, number>();
+    for (const sellerId of sellerIds) {
+      const offered = (configuredBySeller.get(sellerId) ?? []).filter(id => activeMethodIds.includes(id));
+      const allowed = offered.length ? offered : activeMethodIds;
+      const requested = Number(methodBySeller[sellerId]) || 0;
+      if (requested && !allowed.includes(String(requested))) {
+        await client.query("ROLLBACK");
+        const name = sellerNameById.get(sellerId) ?? `Seller #${sellerId}`;
+        return void fail(res, 400, `${name} does not offer that exchange method. Choose one of their available options.`);
+      }
+      chosenBySeller.set(sellerId, requested || Number(allowed[0]));
+    }
+
+    // Pickup orders do not need a street address. Delivery orders still do.
+    const needsDelivery = [...sellerIds].some((sellerId) => {
+      const methodId = chosenBySeller.get(sellerId) ?? Number(activeMethodIds[0]);
+      return !isPickupMethod(methodNameById.get(String(methodId)));
+    });
+    if (needsDelivery && !delivery.street) {
+      await client.query("ROLLBACK");
+      return void fail(res, 400, "A street address is required when a seller delivers.");
+    }
+    const pickupRows = await client.query<{ seller_id: string; location: string; instructions: string | null }>(
+      `SELECT seller_id, location, instructions FROM seller_pickup_detail
+       WHERE seller_id = ANY($1)`, [[...sellerIds]]);
+    const pickupBySeller = new Map<string, { location: string; instructions: string }>();
+    for (const row of pickupRows.rows) {
+      pickupBySeller.set(String(row.seller_id), {
+        location: row.location,
+        instructions: row.instructions ?? "",
+      });
+    }
 
     const orderRes = await client.query<{ order_id: string; ordered_at: Date }>(
       `INSERT INTO market_order (buyer_id, currency, total_amount_minor,
                                  delivery_name, delivery_phone, delivery_street, delivery_city, delivery_zip)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING order_id, ordered_at`,
-      [user.user_id, CURRENCY, totalMinor, delivery.name, delivery.phone || null, delivery.street,
+      [user.user_id, CURRENCY, totalMinor, delivery.name, delivery.phone || null, delivery.street || null,
         delivery.city || null, delivery.zip || null],
     );
     const orderId = orderRes.rows[0].order_id;
@@ -596,11 +731,15 @@ api.post("/checkout", asyncWrap(async (req, res, next) => {
       orderItemIds.push({ sellerId: l.sellerId, orderItemId: ir.rows[0].order_item_id });
     }
     for (const sellerId of sellerIds) {
+      const methodId = chosenBySeller.get(sellerId) ?? Number(activeMethodIds[0]);
+      const pickup = isPickupMethod(methodNameById.get(String(methodId)))
+        ? pickupBySeller.get(sellerId)
+        : undefined;
       const sr = await client.query<{ seller_order_id: string }>(
-        `INSERT INTO seller_order (order_id, seller_id, exchange_method_id)
-         VALUES ($1, $2, $3) RETURNING seller_order_id`,
-        [orderId, sellerId,
-          Number(methodBySeller[sellerId]) || fallbackMethod],
+        `INSERT INTO seller_order (order_id, seller_id, exchange_method_id,
+                                   pickup_location_snapshot, pickup_instructions_snapshot)
+         VALUES ($1, $2, $3, $4, $5) RETURNING seller_order_id`,
+        [orderId, sellerId, methodId, pickup?.location ?? null, pickup?.instructions || null],
       );
       const sellerOrderId = sr.rows[0].seller_order_id;
       for (const oi of orderItemIds.filter(x => x.sellerId === sellerId)) {
@@ -642,10 +781,12 @@ async function orderViews(orderIds: string[]): Promise<Record<string, unknown>[]
   const sos = (await q<{
     order_id: string; seller_order_id: string; seller_id: string; seller_name: string;
     method_name: string; fulfillment_status: string; release_status: string;
-    tracking_number: string | null;
+    tracking_number: string | null; pickup_location_snapshot: string | null;
+    pickup_instructions_snapshot: string | null;
   }>(
     `SELECT so.order_id, so.seller_order_id, so.seller_id, u.name AS seller_name,
-            m.name AS method_name, so.fulfillment_status, so.release_status, so.tracking_number
+            m.name AS method_name, so.fulfillment_status, so.release_status, so.tracking_number,
+            so.pickup_location_snapshot, so.pickup_instructions_snapshot
      FROM seller_order so
      JOIN app_user u ON u.user_id = so.seller_id
      JOIN exchange_method m ON m.exchange_method_id = so.exchange_method_id
@@ -703,6 +844,9 @@ async function orderViews(orderIds: string[]): Promise<Record<string, unknown>[]
       fulfillment: s.fulfillment_status,
       release: s.release_status,
       tracking: s.tracking_number ?? "",
+      pickup: s.pickup_location_snapshot
+        ? { location: s.pickup_location_snapshot, instructions: s.pickup_instructions_snapshot ?? "" }
+        : null,
       reviewed: reviewed.has(s.seller_order_id),
       items: (itemsBySellerOrder.get(s.seller_order_id) ?? []).map(i => ({
         productId: i.product_id, title: i.title, qty: i.quantity,
@@ -1189,6 +1333,7 @@ api.post("/order/:id/cancel", asyncWrap(async (req, res) => {
 api.get("/seller/listings", asyncWrap(async (req, res) => {
   const user = await requireUser(req, res);
   if (!user) return;
+  if (!hasRole(user, "seller")) return void fail(res, 403, "Become a seller first.");
   const { rows } = await q<Record<string, unknown>>(
     `SELECT p.product_id, p.seller_id, p.category_id, c.name AS category_name, p.title, p.description, p.image_url,
             p.asking_price, p.quantity_available, p.listing_status
@@ -1200,18 +1345,21 @@ api.get("/seller/listings", asyncWrap(async (req, res) => {
 api.get("/seller/orders", asyncWrap(async (req, res) => {
   const user = await requireUser(req, res);
   if (!user) return;
+  if (!hasRole(user, "seller")) return void fail(res, 403, "Become a seller first.");
   const { rows } = await q<{
-    seller_order_id: string; order_id: string; buyer_name: string;
+    seller_order_id: string; order_id: string; buyer_name: string; method_name: string;
     fulfillment_status: string; release_status: string; tracking_number: string | null;
     delivery_name: string | null; delivery_phone: string | null; delivery_street: string | null;
     delivery_city: string | null; delivery_zip: string | null; currency: string;
-  }>(        `SELECT so.seller_order_id, so.order_id, u.name AS buyer_name,
+    pickup_location_snapshot: string | null; pickup_instructions_snapshot: string | null;
+  }>(        `SELECT so.seller_order_id, so.order_id, u.name AS buyer_name, m.name AS method_name,
                 so.fulfillment_status, so.release_status, so.tracking_number,
                 mo.delivery_name, mo.delivery_phone, mo.delivery_street, mo.delivery_city, mo.delivery_zip,
-                mo.currency
+                mo.currency, so.pickup_location_snapshot, so.pickup_instructions_snapshot
      FROM seller_order so
      JOIN market_order mo USING(order_id)
      JOIN app_user u ON u.user_id = mo.buyer_id
+     JOIN exchange_method m ON m.exchange_method_id = so.exchange_method_id
      WHERE so.seller_id = $1 AND mo.order_status <> 'pending'
      ORDER BY so.seller_order_id DESC`, [user.user_id]);
   const ids = rows.map(r => r.seller_order_id);
@@ -1228,8 +1376,12 @@ api.get("/seller/orders", asyncWrap(async (req, res) => {
       const its = items.filter(i => i.seller_order_id === r.seller_order_id);
       return {
         id: r.seller_order_id, orderId: r.order_id, buyerName: r.buyer_name,
+        method: r.method_name,
         fulfillment: r.fulfillment_status, release: r.release_status,
         tracking: r.tracking_number ?? "",
+        pickup: r.pickup_location_snapshot
+          ? { location: r.pickup_location_snapshot, instructions: r.pickup_instructions_snapshot ?? "" }
+          : null,
         delivery: {
           name: r.delivery_name ?? "",
           phone: r.delivery_phone ?? "",
@@ -1248,6 +1400,7 @@ api.get("/seller/orders", asyncWrap(async (req, res) => {
 api.get("/seller/stats", asyncWrap(async (req, res) => {
   const user = await requireUser(req, res);
   if (!user) return;
+  if (!hasRole(user, "seller")) return void fail(res, 403, "Become a seller first.");
   const [totals, counts, daily, top] = await Promise.all([
     q<{ revenue_minor: string; units: string }>(
       `SELECT coalesce(sum(oi.line_total_minor),0)::text AS revenue_minor,
@@ -1304,6 +1457,105 @@ api.get("/seller/stats", asyncWrap(async (req, res) => {
       units: Number(r.units),
       revenueMinor: Number(r.revenue_minor),
     })),
+  });
+}));
+
+/** The current seller's checkout options: every active method, with their saved choice. */
+api.get("/seller/methods", asyncWrap(async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!hasRole(user, "seller")) return void fail(res, 403, "Become a seller first.");
+  const [all, mine] = await Promise.all([
+    q<{ id: string; name: string }>(
+      `SELECT exchange_method_id AS id, name FROM exchange_method
+       WHERE method_status='active' ORDER BY name`),
+    q<{ exchange_method_id: string }>(
+      `SELECT exchange_method_id FROM seller_exchange_method WHERE seller_id = $1`, [user.user_id]),
+  ]);
+  const activeIds = new Set(all.rows.map(r => String(r.id)));
+  const saved = mine.rows.map(r => String(r.exchange_method_id)).filter(id => activeIds.has(id));
+  // No saved rows means "all methods", matching the schema default.
+  const enabled = saved.length ? new Set(saved) : activeIds;
+  res.json({
+    configured: mine.rows.length > 0,
+    methods: all.rows.map(m => ({ id: m.id, name: m.name, enabled: enabled.has(String(m.id)) })),
+  });
+}));
+
+/** Replaces the seller's method choices. At least one active method is required. */
+api.put("/seller/methods", asyncWrap(async (req, res, next) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!hasRole(user, "seller")) return void fail(res, 403, "Become a seller first.");
+  const raw = (req.body as { methodIds?: unknown } | undefined)?.methodIds;
+  const ids = [...new Set((Array.isArray(raw) ? raw : [])
+    .map(Number)
+    .filter(n => Number.isInteger(n) && n > 0))];
+  if (!ids.length) return void fail(res, 400, "Choose at least one exchange method.");
+
+  const valid = await q<{ id: string }>(
+    `SELECT exchange_method_id AS id FROM exchange_method
+     WHERE method_status='active' AND exchange_method_id = ANY($1)`, [ids]);
+  if (valid.rows.length !== ids.length) {
+    return void fail(res, 400, "One of those exchange methods is no longer available.");
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`DELETE FROM seller_exchange_method WHERE seller_id = $1`, [user.user_id]);
+    for (const id of ids) {
+      await client.query(
+        `INSERT INTO seller_exchange_method (seller_id, exchange_method_id) VALUES ($1, $2)`,
+        [user.user_id, id],
+      );
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    next(e);
+    return;
+  } finally {
+    client.release();
+  }
+  invalidateCatalogue();
+  res.json({ ok: true, methodIds: ids });
+}));
+
+/** The seller's pickup point, shown to buyers who choose pickup. */
+api.get("/seller/pickup", asyncWrap(async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!hasRole(user, "seller")) return void fail(res, 403, "Become a seller first.");
+  const { rows } = await q<{ location: string; instructions: string | null }>(
+    `SELECT location, instructions FROM seller_pickup_detail WHERE seller_id = $1`, [user.user_id]);
+  res.json({
+    pickup: rows[0]
+      ? { location: rows[0].location, instructions: rows[0].instructions ?? "" }
+      : null,
+  });
+}));
+
+/** Upserts the pickup point. Location is required; instructions are optional. */
+api.put("/seller/pickup", asyncWrap(async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!hasRole(user, "seller")) return void fail(res, 403, "Become a seller first.");
+  const body = (req.body ?? {}) as { location?: unknown; instructions?: unknown };
+  const location = (typeof body.location === "string" ? body.location.trim() : "").slice(0, 300);
+  const instructions = (typeof body.instructions === "string" ? body.instructions.trim() : "").slice(0, 1000);
+  if (!location) return void fail(res, 400, "Pickup location is required.");
+  const { rows } = await q<{ location: string; instructions: string | null }>(
+    `INSERT INTO seller_pickup_detail (seller_id, location, instructions, updated_at)
+     VALUES ($1, $2, $3, now())
+     ON CONFLICT (seller_id) DO UPDATE
+       SET location = EXCLUDED.location, instructions = EXCLUDED.instructions, updated_at = now()
+     RETURNING location, instructions`,
+    [user.user_id, location, instructions || null],
+  );
+  invalidateCatalogue();
+  res.json({
+    pickup: { location: rows[0].location, instructions: rows[0].instructions ?? "" },
   });
 }));
 

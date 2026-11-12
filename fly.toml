@@ -1,22 +1,33 @@
-# fly.toml app configuration file generated for software-dev-project on 2026-11-10T16:54:10Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
-app = 'software-dev-project'
-primary_region = 'ams'
+# Fly.io service definition for the M-DUKA container.
+# Secrets (DATABASE_URL, DATABASE_URL_UNPOOLED) are set with `fly secrets set`,
+# never here. Everything non-secret lives in [env] so a deploy is reproducible.
+app = "software-dev-project"
 
 [build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  APP_CURRENCY = "USD"
+  PAYMENT_PROVIDER = "demo"
+
 [http_service]
-  internal_port = 8080
+  # src/server.ts listens on PORT (3000), so the proxy must route there too.
+  internal_port = 3000
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = "stop"
   auto_start_machines = true
   min_machines_running = 0
-  processes = ['app']
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/health"
 
 [[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
+  memory = "512mb"
+  cpu_kind = "shared"
   cpus = 1
-  memory_mb = 256

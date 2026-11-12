@@ -4,6 +4,8 @@
  * Usage: node scripts/stress-test.mjs   (BASE_URL defaults to http://127.0.0.1:3003)
  * Requires the server to be running and the demo data seeded.
  */
+import { cleanupTestAccounts } from "./lib/test-accounts.mjs";
+
 const BASE = process.env.BASE_URL || "http://127.0.0.1:3003";
 let pass = 0;
 const failures = [];
@@ -16,6 +18,7 @@ const section = (s) => console.log("\n### " + s);
 class Jar {
   constructor() { this.cookies = new Map(); }
   header() { return [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; "); }
+  csrf() { return this.cookies.get("csrf") ?? ""; }
   absorb(res) {
     const list = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
     for (const raw of list) {
@@ -53,11 +56,23 @@ class Jar {
 
 const uniq = (tag) => `${tag}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 const PW = "StressPass123!";
+const createdEmails = [];
 
 async function register(jar, tag, extra = {}) {
   const email = uniq(tag);
   const r = await jar.json("/api/auth/register", { method: "POST", json: { name: "Stress " + tag, email, password: PW, ...extra } });
+  if (r.status === 201) createdEmails.push(email);
   return { ...r, email };
+}
+
+async function cleanupTestRun() {
+  try {
+    const result = await cleanupTestAccounts(createdEmails);
+    if (result.deleted) console.log(`  INFO  cleanup: removed ${result.deleted} test account(s)`);
+  } catch (e) {
+    console.log(`  INFO  cleanup failed — ${e.message}`);
+    process.exitCode = 1;
+  }
 }
 
 async function loginApi(jar, email, password) {
@@ -94,7 +109,9 @@ async function main() {
     ok("Storefront has a skip link to #app", root.body.includes('class="skip"') && root.body.includes('href="#app"'));
     ok("Storefront has a visible browse heading", root.body.includes("Browse the market"));
     ok("Storefront no longer uses emoji product media", !root.body.includes("📷") && !root.body.includes("🪴") && !root.body.includes("📦"));
-    ok("Storefront renders image fallbacks with alt text", root.body.includes("function media(") && root.body.includes('referrerpolicy="no-referrer"') && root.body.includes("loading=\"lazy\""));
+    ok("Storefront renders image fallbacks with alt text",
+      root.body.includes("function media(") && root.body.includes('referrerpolicy="no-referrer"') &&
+      root.body.includes('loading="${big?"eager":"lazy"}"') && root.body.includes('alt="${esc(title)}"'));
     ok("Seller listing form exposes an image URL", root.body.includes('name="imageUrl"') && root.body.includes("Image URL (optional)"));
     ok("Review dialog is announced", root.body.includes('setAttribute("role","dialog")') && root.body.includes('setAttribute("aria-modal","true")'));
     ok("Toasts are live regions", root.body.includes('setAttribute("role","status")') && root.body.includes('setAttribute("aria-live","polite")'));
@@ -136,7 +153,10 @@ async function main() {
     ok("Non-numeric min rejected with 400 (not 500)", r5.status === 400, `status ${r5.status}`);
     const r6 = await anon.json("/api/products?q=%27%20OR%201%3D1--");
     ok("SQL-injection-shaped search returns normal empty set", r6.status === 200 && r6.data.products.length === 0);
-    const one = products[0];
+    // Test cleanup removes rows directly, so the guest catalogue cache may still
+    // contain a previous suite's listing for a few seconds. Use the seeded demo
+    // product rather than whichever listing happens to be first in that cache.
+    const one = products.find((p) => p.title === "Denim jacket") ?? products[0];
     const d = await anon.json("/api/products/" + one.id);
     ok("Product detail 200 with seller rating shape", d.status === 200 && d.data.product?.id === one.id);
     ok("Product carries an imageUrl field (nullable)", "imageUrl" in (d.data.product ?? {}), JSON.stringify(d.data.product?.imageUrl));
@@ -165,7 +185,9 @@ async function main() {
     ok("Bootstrap carries signed-in user + roles", boot.data?.user?.email === buyerEmail && boot.data.user.roles.includes("buyer"));
     const wrong = await new Jar().json("/api/auth/login", { method: "POST", json: { email: buyerEmail, password: "wrong-password" } });
     ok("Wrong password 401", wrong.status === 401);
-    const good = await loginApi(new Jar(), buyerEmail, PW);
+    // Re-login on the existing jar, not a second one: a new login revokes the
+    // account's older sessions, and the buyer jar is used by later sections.
+    const good = await loginApi(buyer, buyerEmail, PW);
     ok("Login 200", good.status === 200 && good.data?.user?.email === buyerEmail);
     const inj = await new Jar().json("/api/auth/login", { method: "POST", json: { email: "' OR 1=1 --", password: PW } });
     ok("SQL-injection login rejected", inj.status === 401, `status ${inj.status}`);
@@ -340,17 +362,22 @@ async function main() {
     const admin = new Jar();
     const anonAdmin = await anon.req("/admin");
     ok("/admin requires login (302)", anonAdmin.res.status === 302 && (anonAdmin.res.headers.get("location") || "").includes("/admin/login"));
-    const loginPage = await anon.text("/admin/login");
+    const loginPage = await admin.text("/admin/login");
     ok("Admin login page renders with security headers", loginPage.status === 200 && !!loginPage.headers.get("content-security-policy") && loginPage.headers.get("x-content-type-options") === "nosniff");
-    const login = await admin.req("/admin/login", { method: "POST", form: { email: "stress-admin@example.com", password: "StressPass123!" } });
+    const login = await admin.req("/admin/login", { method: "POST", form: { _csrf: admin.csrf(), email: "stress-admin@example.com", password: "StressPass123!" } });
     ok("Super admin login redirects into panel", login.res.status === 302, `status ${login.res.status}`);
     const dash = await admin.text("/admin");
     ok("Dashboard renders", dash.status === 200 && dash.body.includes("Dashboard"));
     ok("Dashboard shows revenue chart", dash.body.includes('data-chart="revenue"'));
     ok("Dashboard shows an order pipeline", dash.body.includes("Order pipeline"));
     ok("Admin uses inline SVG icons", dash.body.includes('<symbol id="icon-dashboard"') && !dash.body.includes("ph ph-"));
+    ok("Admin dashboard uses self-hosted Bootstrap",
+      dash.body.includes("/admin/static/vendor/bootstrap/5.3.3/bootstrap.min.css") &&
+      dash.body.includes("/admin/static/vendor/bootstrap/5.3.3/bootstrap.bundle.min.js") &&
+      !dash.body.includes("cdn.jsdelivr") && !dash.body.includes("cdnjs"));
     const csp = dash.headers.get("content-security-policy") ?? "";
     ok("Admin CSP allows product images from https", /img-src[^;]*https:/.test(csp), csp);
+    ok("Admin CSP no longer allows CDN scripts or styles", !/cdn\.jsdelivr|cdnjs/.test(csp), csp);
     for (const p of ["/admin/products", "/admin/products/categories", "/admin/orders", "/admin/users", "/admin/exchange", "/admin/audit"]) {
       const r = await admin.text(p);
       ok(`GET ${p} 200`, r.status === 200, `status ${r.status}`);
@@ -363,19 +390,23 @@ async function main() {
     ok("Admin search reflects input escaped (no raw <script>)", xss.status === 200 && !xss.body.includes("<script>alert(1)</script>"));
 
     const plainEmail = uniq("admin");
-    const created = await admin.req("/admin/users/new", { method: "POST", form: { name: "Plain Admin", email: plainEmail, phone: "", password: PW, roles: "admin" } });
+    const created = await admin.req("/admin/users/new", { method: "POST", form: { _csrf: admin.csrf(), name: "Plain Admin", email: plainEmail, phone: "", password: PW, roles: "admin" } });
+    if (created.res.status === 302) createdEmails.push(plainEmail);
     ok("Super admin can create a plain admin", created.res.status === 302, `status ${created.res.status}`);
-    const escalated = await admin.req("/admin/users/new", { method: "POST", form: { name: "Escalate", email: uniq("esc"), password: PW, roles: "super_admin" } });
+    const escalatedEmail = uniq("esc");
+    const escalated = await admin.req("/admin/users/new", { method: "POST", form: { _csrf: admin.csrf(), name: "Escalate", email: escalatedEmail, password: PW, roles: "super_admin" } });
+    if (escalated.res.status === 302) createdEmails.push(escalatedEmail);
     ok("Super admin may create super admin (control)", escalated.res.status === 302, `status ${escalated.res.status}`);
 
     const plain = new Jar();
-    const pl = await plain.req("/admin/login", { method: "POST", form: { email: plainEmail, password: PW } });
+    await plain.text("/admin/login");
+    const pl = await plain.req("/admin/login", { method: "POST", form: { _csrf: plain.csrf(), email: plainEmail, password: PW } });
     ok("Plain admin can log in", pl.res.status === 302, `status ${pl.res.status}`);
     const exchange = await plain.text("/admin/exchange");
     ok("Plain admin blocked from super-admin exchange page (403)", exchange.status === 403, `status ${exchange.status}`);
     const audit = await plain.text("/admin/audit");
     ok("Plain admin blocked from audit log (403)", audit.status === 403, `status ${audit.status}`);
-    const plainEscalate = await plain.req("/admin/users/new", { method: "POST", form: { name: "Bad", email: uniq("bad"), password: PW, roles: "super_admin" } });
+    const plainEscalate = await plain.req("/admin/users/new", { method: "POST", form: { _csrf: plain.csrf(), name: "Bad", email: uniq("bad"), password: PW, roles: "super_admin" } });
     ok("Plain admin cannot create a super admin (400)", plainEscalate.res.status === 400, `status ${plainEscalate.res.status}`);
   }
 
@@ -417,7 +448,9 @@ async function main() {
       const j = new Jar();
       return register(j, "load" + i);
     }));
-    ok("12 concurrent registrations all succeed", regs.every((r) => r.status === 201), regs.map((r) => r.status).join(","));
+    ok("12 concurrent registrations return 201 or an explicit 429, never 5xx",
+      regs.every((r) => [201, 429].includes(r.status)) && regs.some((r) => r.status === 201),
+      regs.map((r) => r.status).join(","));
 
     const logins = await Promise.all(Array.from({ length: 10 }, () => loginApi(new Jar(), buyerEmail, PW)));
     ok("10 concurrent logins all succeed", logins.every((r) => r.status === 200), logins.map((r) => r.status).join(","));
@@ -440,4 +473,6 @@ async function main() {
 }
 
 
-main().catch((e) => { console.error("HARNESS ERROR:", e); process.exitCode = 2; });
+main()
+  .catch((e) => { console.error("HARNESS ERROR:", e); process.exitCode = 2; })
+  .finally(cleanupTestRun);

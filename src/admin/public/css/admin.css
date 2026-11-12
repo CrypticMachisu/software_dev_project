@@ -1,7 +1,6 @@
 /* ===== M-DUKA admin panel =====
    Same brand family as the storefront (Fraunces + Instrument Sans, terracotta
    accent), but a quieter, higher-contrast back-office treatment. */
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Instrument+Sans:wght@400..700&display=swap");
 
 :root{
   --paper:#f3efe5; --panel:#fffdf6; --ink:#262a1d; --mute:#6f6653;

@@ -38,9 +38,9 @@ adminApp.use(
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
-        "style-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
-        "script-src": ["'self'", "https://cdn.jsdelivr.net"],
-        "font-src": ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "script-src": ["'self'"],
+        "font-src": ["'self'"],
         "img-src": ["'self'", "data:", "https:"],
         "upgrade-insecure-requests": null,
       },
@@ -51,7 +51,10 @@ adminApp.use(express.urlencoded({ extended: false }));
 adminApp.use(cookieParser());
 // Rejects any state-changing request whose form did not carry this session's token.
 adminApp.use(csrfProtection);
-adminApp.use("/admin/static", express.static(path.resolve(process.cwd(), "src", "admin", "public")));
+const adminPublicDir = path.resolve(process.cwd(), "src", "admin", "public");
+// Vendor files live at versioned paths, so they are safe to cache aggressively.
+adminApp.use("/admin/static/vendor", express.static(path.join(adminPublicDir, "vendor"), { maxAge: "7d", immutable: true }));
+adminApp.use("/admin/static", express.static(adminPublicDir));
 
 // Display helpers available in every view
 adminApp.locals.currency = env.currency;

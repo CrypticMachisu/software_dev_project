@@ -28,7 +28,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3. Serve public client frontend (index.html)
+  // 3. Self-hosted brand fonts and their @font-face stylesheet
+  if (req.method === "GET" && url.pathname.startsWith("/fonts/")) {
+    const name = url.pathname.slice("/fonts/".length);
+    const ext = path.extname(name);
+    const types: Record<string, string> = {
+      ".css": "text/css; charset=utf-8",
+      ".woff2": "font/woff2",
+    };
+    const type = types[ext];
+    // basename check keeps /fonts/../server.ts and encoded slashes out.
+    if (!type || !name || name !== path.basename(name)) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "not found" }));
+      return;
+    }
+    fs.readFile(path.resolve(process.cwd(), "src", "public", "fonts", name), (err, data) => {
+      if (err) {
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      res.writeHead(200, {
+        "content-type": type,
+        "cache-control": "public, max-age=604800",
+        "x-content-type-options": "nosniff",
+      });
+      res.end(data);
+    });
+    return;
+  }
+
+  // 4. Serve public client frontend (index.html)
   if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
     const indexPath = path.resolve(process.cwd(), "src", "public", "index.html");
     if (fs.existsSync(indexPath)) {
@@ -43,7 +74,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 4. Health check route
+  // 5. Health check route
   if (req.method === "GET" && url.pathname === "/health") {
     try {
       // Public: say whether the app and its database are up, nothing about what is inside.

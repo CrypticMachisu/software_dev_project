@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mduka
+          POSTGRES_PASSWORD: mduka
+          POSTGRES_DB: mduka
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mduka -d mduka"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://mduka:mduka@127.0.0.1:5432/mduka
+      DATABASE_URL_UNPOOLED: postgres://mduka:mduka@127.0.0.1:5432/mduka
+      NODE_ENV: test
+      APP_CURRENCY: USD
+      PAYMENT_PROVIDER: demo
+      PORT: "3000"
+      BASE_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Locate Chrome
+        run: |
+          CHROME=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+
+      - name: Migrate and seed
+        run: |
+          node dist/src/migrate.js
+          node dist/src/scripts/seed-admin.js "CI Admin" ci-admin@example.com "CiAdminPass123!" "admin,super_admin"
+          node dist/src/scripts/seed-admin.js "Stress Admin" stress-admin@example.com "StressPass123!" "admin,super_admin"
+          node dist/src/scripts/seed-demo.js
+
+      - name: Start app
+        run: |
+          node dist/src/server.js > /tmp/mduka-server.log 2>&1 &
+          echo $! > /tmp/mduka-server.pid
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$BASE_URL/health" > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/mduka-server.log
+          exit 1
+
+      - name: Run regression, browser, and contrast suites
+        run: npm test
+
+      - name: Run stress harness
+        run: npm run test:stress
+
+      - name: Verify test accounts were cleaned up
+        if: always()
+        run: node scripts/clean-test-accounts.mjs --check
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/mduka-server.log
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ui-screenshots
+          path: screenshots
+          retention-days: 7
+
+      - name: Stop app
+        if: always()
+        run: kill "$(cat /tmp/mduka-server.pid)" 2> /dev/null || true
