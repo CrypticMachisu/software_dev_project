@@ -153,7 +153,7 @@ npm run build && npm start
 `PORT` (default 3000), `APP_CURRENCY` (default USD), `DATABASE_SSL=true`,
 `PAYMENT_PROVIDER=demo|mpesa`, `TRUST_PROXY=true`, `NODE_ENV=production`.
 
-Storefront: `/` · Admin: `/admin` · Health: `/health`
+Storefront: `/` · Admin: `/admin` · Readiness: `/health/ready` (alias `/health`) · Liveness: `/health/live`
 
 Real M-Pesa through the Daraja sandbox — free developer account, no business registration —
 is documented in [INSTALL.md](INSTALL.md#real-m-pesa-payments-daraja-sandbox).

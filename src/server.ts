@@ -74,17 +74,27 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 5. Health check route
-  if (req.method === "GET" && url.pathname === "/health") {
+  // 5. Health checks. Liveness must never touch the database: a failing liveness
+  //    check makes the platform tear the machine down, so a database blip would
+  //    otherwise destroy a perfectly healthy process. Readiness carries the
+  //    database answer, for load balancers and deploys.
+  if (req.method === "GET" && url.pathname === "/health/live") {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, check: "live", uptime: Math.round(process.uptime()) }));
+    return;
+  }
+
+  // /health is kept as an alias of readiness so existing monitors and docs keep working.
+  if (req.method === "GET" && (url.pathname === "/health/ready" || url.pathname === "/health")) {
     try {
       // Public: say whether the app and its database are up, nothing about what is inside.
       await pool.query("SELECT 1");
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: true, uptime: Math.round(process.uptime()) }));
+      res.end(JSON.stringify({ ok: true, check: "ready", uptime: Math.round(process.uptime()) }));
       return;
     } catch {
       res.writeHead(503, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: false }));
+      res.end(JSON.stringify({ ok: false, check: "ready" }));
       return;
     }
   }

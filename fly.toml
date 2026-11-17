@@ -29,7 +29,9 @@ app = "software-dev-project"
     timeout = "10s"
     grace_period = "20s"
     method = "GET"
-    path = "/health"
+    # Liveness only: this check must never depend on the database, or a database blip
+    # makes Fly replace machines that are serving fine. Use /health/ready for the DB.
+    path = "/health/live"
 
 [[vm]]
   memory = "512mb"
