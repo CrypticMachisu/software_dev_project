@@ -9,6 +9,7 @@
     "dev": "tsc && node --env-file=.env dist/src/server.js",
     "admin:seed": "node --env-file=.env dist/src/scripts/seed-admin.js",
     "demo:seed": "node --env-file=.env dist/src/scripts/seed-demo.js",
+    "more:seed": "node --env-file=.env dist/src/scripts/seed-more.js",
     "test:api": "node scripts/regression-test.mjs",
     "test:ui": "node scripts/ui-regression.mjs",
     "test:contrast": "node scripts/check-contrast.mjs",
