@@ -512,8 +512,9 @@ Show the GitHub Actions run.
 > The latest `main` run is green.”
 >
 > “On Fly, migrations run as a release command before the rolling deploy. If a migration fails, the
-> release stops instead of shipping code against an outdated schema. The health check is `/health`,
-> which also verifies the database connection.”
+> release stops instead of shipping code against an outdated schema. The machine check is `/health/live`,
+> which never touches the database, so a database blip cannot make Fly replace a healthy machine;
+> `/health/ready` is the one that checks the connection.”
 
 ### 5.5 Close — 14:30–15:00
 
