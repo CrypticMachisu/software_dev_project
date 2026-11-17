@@ -20,6 +20,7 @@
     <tr>
       <td colspan="2">
         <form id="edit-<%= c.category_id %>" class="row g-2" method="post" action="/admin/products/categories/<%= c.category_id %>/edit">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
           <div class="col-md-5"><input class="form-control form-control-sm" name="name" maxlength="120" value="<%= c.name %>" required aria-label="Name"></div>
           <div class="col-md-7"><input class="form-control form-control-sm" name="description" maxlength="1000" value="<%= c.description || '' %>" aria-label="Description"></div>
         </form>

@@ -27,7 +27,11 @@ a:hover{color:var(--acc-deep)}
 /* ---- shell ---- */
 .admin-shell{min-height:100vh}
 .admin-sidebar{width:238px;flex:none;background:var(--side);color:var(--side-ink);
-  padding:22px 14px;display:flex;flex-direction:column;gap:3px}
+  padding:22px 14px;display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;overflow-y:auto;align-self:flex-start}
+.sidebar-top{display:block}
+.nav-links{display:flex;flex-direction:column;gap:3px;flex:1;min-height:0}
+.nav-toggle{display:none}
 .admin-sidebar .brand{font-family:Fraunces,Georgia,serif;font-style:italic;font-weight:600;
   color:#fff;font-size:1.35rem;padding:6px 14px 16px}
 .admin-sidebar .brand .brand-dot{color:#d67c4b}
@@ -35,7 +39,6 @@ a:hover{color:var(--acc-deep)}
   font-size:.72rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--side-mute)}
 .nav-item-link{display:flex;align-items:center;gap:10px;padding:9px 13px;border-radius:999px;
   font-size:.9rem;font-weight:500;color:var(--side-ink);text-decoration:none;transition:background .18s,color .18s}
-.nav-item-link i{width:20px;text-align:center;font-size:1.05rem;flex:none}
 .nav-item-link:hover{background:rgba(255,255,255,.07);color:#fff;text-decoration:none}
 .nav-item-link.active{background:var(--acc);color:var(--acc-ink)}
 .nav-item-link.disabled{opacity:.4;cursor:not-allowed}
@@ -43,7 +46,7 @@ a:hover{color:var(--acc-deep)}
 .btn .icon{width:16px;height:16px}
 .nav-item-link .icon{width:20px;height:20px}
 .image-preview{margin-top:.65rem;max-width:280px;border:1px solid var(--line);border-radius:12px;
-  overflow:hidden;background:var(--card)}
+  overflow:hidden;background:var(--panel)}
 .image-preview img{display:block;width:100%;height:170px;object-fit:cover}
 .soon{margin-left:auto;font-size:.65rem;font-weight:600;letter-spacing:.08em;
   text-transform:uppercase;color:var(--side-mute);border:1px solid currentColor;
@@ -115,14 +118,6 @@ a:hover{color:var(--acc-deep)}
   .chart-col:nth-child(4n+1) .chart-day{visibility:visible}
 }
 
-/* ---- responsive ---- */
-@media(max-width:768px){
-  .admin-shell{flex-direction:column}
-  .admin-sidebar{width:100%;flex-direction:row;flex-wrap:wrap;align-items:center}
-  .admin-sidebar .brand{padding:8px 12px}
-  .signed-in{margin:0 0 0 auto}
-  .admin-main{padding:18px}
-}
 
 /* ---- reports ---- */
 .report-head{display:flex;gap:18px;align-items:flex-start;border-bottom:2px solid var(--ink);
@@ -151,4 +146,78 @@ a:hover{color:var(--acc-deep)}
   .report-table td,.report-table th{padding:4px 6px}
   tr{break-inside:avoid}
   a{color:#000;text-decoration:none}
+}
+
+/* ================= audit fixes ================= */
+
+/* Cards that have no .card-body (stat tiles, chart, pipeline) had no padding at all. */
+.card:not(:has(> .card-body)){padding:var(--s5)}
+.card>.card-body{padding:var(--s5)}
+.admin-main>.card,.admin-main>.row{margin-bottom:var(--s4)}
+.dash-kpis .card,.dash-kpis .stat-card{margin-bottom:0}
+.stat-card{display:flex;flex-direction:column;gap:var(--s1)}
+.card h2.h6{font-family:Fraunces,Georgia,serif;font-size:1.05rem;font-weight:560;margin-bottom:var(--s3)}
+.chart-card .d-flex{margin-bottom:var(--s3)!important}
+
+/* Top bar */
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:var(--s4);margin-bottom:var(--s5)}
+.topbar h1{margin:0;min-width:0;overflow-wrap:anywhere}
+.topbar-actions{display:flex;align-items:center;gap:var(--s3);flex:none}
+
+/* Buttons never break onto two lines (the Categories / Add product pair did). */
+.btn{white-space:nowrap}
+.btn-link{--bs-btn-color:var(--acc);--bs-btn-hover-color:var(--acc-deep);--bs-btn-active-color:var(--acc-deep);
+  font-weight:600;text-decoration:none}
+.btn-link:hover{text-decoration:underline}
+.btn-outline-warning{--bs-btn-color:var(--warn);--bs-btn-border-color:rgba(122,82,23,.4);
+  --bs-btn-hover-bg:var(--warn-soft);--bs-btn-hover-color:var(--warn);--bs-btn-hover-border-color:var(--warn)}
+.btn-outline-danger{--bs-btn-color:var(--bad);--bs-btn-border-color:rgba(178,59,52,.4);
+  --bs-btn-hover-bg:var(--bad-soft);--bs-btn-hover-color:var(--bad);--bs-btn-hover-border-color:var(--bad)}
+.btn:focus-visible,.form-control:focus-visible,.form-select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* Status badges that Bootstrap left in its default greys */
+.badge{font-weight:600;letter-spacing:.01em}
+.badge.text-bg-secondary{background:var(--line)!important;color:var(--ink)!important}
+.badge.text-bg-light{background:var(--line-soft)!important;color:var(--mute)!important;border:1px solid var(--line)}
+.badge.text-bg-info{background:var(--acc-soft)!important;color:var(--acc-deep)!important}
+
+/* Tables: keep money and statuses on one line; the wrapper scrolls instead */
+.table td,.table th{vertical-align:middle}
+.table td.text-end,.table th.text-end,.table .badge{white-space:nowrap}
+.table-responsive{-webkit-overflow-scrolling:touch}
+
+/* Sidebar: the "signed in" note stays pinned to the bottom */
+.signed-in{margin-top:auto}
+
+/* Skip link for keyboard users */
+.skip-link{position:absolute;left:-999px;top:8px;background:var(--panel);color:var(--ink);
+  padding:8px 14px;border-radius:999px;z-index:100;border:1px solid var(--line)}
+.skip-link:focus{left:12px}
+
+/* ---- responsive ---- */
+@media(max-width:768px){
+  .admin-shell{flex-direction:column}
+  .admin-sidebar{width:100%;height:auto;position:sticky;top:0;z-index:50;padding:10px 14px;
+    overflow:visible;align-self:stretch}
+  .sidebar-top{display:flex;align-items:center;justify-content:space-between}
+  .admin-sidebar .brand{padding:4px 2px}
+  .admin-sidebar .brand small{display:none}
+  .nav-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;
+    background:rgba(255,255,255,.08);color:var(--side-ink);border:1px solid rgba(255,255,255,.18);
+    border-radius:999px;font:600 .9rem "Instrument Sans",system-ui,sans-serif}
+  .nav-toggle:hover{background:rgba(255,255,255,.14)}
+  .nav-links{display:none;max-height:calc(100vh - 80px);overflow-y:auto;padding-top:10px}
+  .admin-sidebar.nav-open .nav-links{display:flex}
+  .nav-item-link{min-height:44px}
+  .admin-main{padding:18px 16px 40px}
+  .topbar{flex-wrap:wrap}
+  .topbar-actions{flex-wrap:wrap;gap:var(--s2)}
+  .topbar-name{display:none}
+  .card:not(:has(> .card-body)),.card>.card-body{padding:var(--s4)}
+}
+@media(max-width:340px){
+  .dash-kpis,.pipeline{grid-template-columns:minmax(0,1fr)}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;scroll-behavior:auto!important}
 }

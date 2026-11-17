@@ -17,6 +17,7 @@
       <tr>
         <td>
           <form id="em-<%= m.exchange_method_id %>" class="row g-2" method="post" action="/admin/exchange/<%= m.exchange_method_id %>/edit">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
             <div class="col-md-5"><input class="form-control form-control-sm" name="name" maxlength="120" value="<%= m.name %>" required aria-label="Name"></div>
             <div class="col-md-7"><input class="form-control form-control-sm" name="description" maxlength="1000" value="<%= m.description || '' %>" aria-label="Description"></div>
           </form>

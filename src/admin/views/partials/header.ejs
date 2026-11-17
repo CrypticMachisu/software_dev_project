@@ -10,6 +10,7 @@
 <link href="/admin/static/css/admin.css" rel="stylesheet">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <%- include('icons') %>
 <% const nav = [
   { key: 'dashboard', label: 'Dashboard',        href: '/admin',          icon: 'icon-dashboard', ready: true  },
@@ -26,23 +27,29 @@
   { key: 'settings',  label: 'Settings',         href: '/admin/settings', icon: 'icon-gear', ready: false, superOnly: true }
 ]; %>
 <div class="admin-shell d-flex">
-  <nav class="admin-sidebar">
-    <div class="brand">M-DUKA<span class="brand-dot">.</span><small>Admin panel</small></div>
+  <nav class="admin-sidebar" id="admin-nav" aria-label="Admin sections">
+    <div class="sidebar-top">
+      <div class="brand">M-DUKA<span class="brand-dot">.</span><small>Admin panel</small></div>
+      <button class="nav-toggle" type="button" aria-controls="admin-links" aria-expanded="false" data-nav-toggle><svg class="icon" aria-hidden="true"><use href="#icon-menu"></use></svg><span>Menu</span></button>
+    </div>
+    <div class="nav-links" id="admin-links">
     <% nav.forEach(n => { if (n.superOnly && !isSuper) return; %>
       <% if (n.ready) { %>
-        <a class="nav-item-link <%= active === n.key ? 'active' : '' %>" href="<%= n.href %>"><svg class="icon" aria-hidden="true"><use href="#<%= n.icon %>"></use></svg> <%= n.label %></a>
+        <a class="nav-item-link <%= active === n.key ? 'active' : '' %>" href="<%= n.href %>"<%- active === n.key ? ' aria-current="page"' : '' %>><svg class="icon" aria-hidden="true"><use href="#<%= n.icon %>"></use></svg> <%= n.label %></a>
       <% } else { %>
         <span class="nav-item-link disabled"><svg class="icon" aria-hidden="true"><use href="#<%= n.icon %>"></use></svg> <%= n.label %> <span class="soon">Soon</span></span>
       <% } %>
     <% }) %>
     <div class="signed-in">Signed in as <%= isSuper ? 'Super admin' : 'Admin' %></div>
+    </div>
   </nav>
-  <main class="admin-main flex-grow-1">
-    <header class="d-flex justify-content-between align-items-center mb-4">
+  <main class="admin-main flex-grow-1" id="main" tabindex="-1">
+    <header class="topbar">
       <h1 class="h3 m-0"><%= title %></h1>
-      <form method="post" action="/admin/logout" class="d-flex align-items-center gap-3 m-0">
+      <form method="post" action="/admin/logout" class="topbar-actions m-0">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <span class="text-muted"><%= user.name %></span>
+        <a class="btn btn-outline-secondary btn-sm" href="/"><svg class="icon" aria-hidden="true"><use href="#icon-store"></use></svg> View store</a>
+        <span class="text-muted topbar-name"><%= user.name %></span>
         <button class="btn btn-outline-secondary btn-sm"><svg class="icon" aria-hidden="true"><use href="#icon-logout"></use></svg> Log out</button>
       </form>
     </header>
