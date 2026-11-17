@@ -1,0 +1,5 @@
+# Vendored third-party assets are pinned by Subresource Integrity hashes in the
+# admin templates (integrity="sha384-..."). Any byte change breaks the hash and
+# the browser refuses to load the file, so Git must never rewrite their line
+# endings on checkout.
+src/admin/public/vendor/** -text
