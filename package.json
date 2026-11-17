@@ -13,9 +13,10 @@
     "test:api": "node scripts/regression-test.mjs",
     "test:ui": "node scripts/ui-regression.mjs",
     "test:contrast": "node scripts/check-contrast.mjs",
+    "test:assets": "node scripts/check-assets.mjs",
     "test:stress": "node scripts/stress-test.mjs",
     "test:clean": "node scripts/clean-test-accounts.mjs",
-    "test": "npm run test:api && npm run test:ui && npm run test:contrast"
+    "test": "npm run test:api && npm run test:ui && npm run test:contrast && npm run test:assets"
   },
   "dependencies": {
     "@neon/config": "^1.9.3",

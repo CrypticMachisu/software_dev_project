@@ -98,11 +98,16 @@ const server = http.createServer(async (req, res) => {
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 
+// Boot-time housekeeping must never take the process down. Node exits on an
+// unhandled rejection, so a cold or briefly unreachable database would kill the
+// app before it served a single request; log the failure and keep serving.
+const warnBackground = (task: string) => (err: unknown): void => console.error(`${task} failed`, err);
+
 // Expired sessions are dead weight; clear them on boot so auth_session cannot grow forever.
 void pool
   .query(`DELETE FROM auth_session
           WHERE expires_at < now() - interval '1 day' OR revoked_at < now() - interval '1 day'`)
-  .catch((err: unknown) => console.error("session cleanup failed", err));
+  .catch(warnBackground("session cleanup"));
 
 if (process.env.NODE_ENV !== "production") {
   console.warn(
@@ -112,8 +117,8 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // Abandoned checkouts never hold stock, but they should not pile up either.
-void expireStaleOrders();
-setInterval(() => void expireStaleOrders(), 5 * 60 * 1000).unref();
+void expireStaleOrders().catch(warnBackground("stale order expiry"));
+setInterval(() => void expireStaleOrders().catch(warnBackground("stale order expiry")), 5 * 60 * 1000).unref();
 
 server.listen(port, () => {
   console.log(`listening on http://127.0.0.1:${port}`);
