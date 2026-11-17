@@ -83,6 +83,23 @@ const IMAGE_URLS: Record<string, string> = {
   "Denim jacket":        unsplash("h6ajwqvCKsY"),
   "Ceramic planter":     unsplash("3aVVXqJmgoY"),
   "Wooden train set":    unsplash("uJx4IFjx7U0"),
+
+  // Listings that shipped with no photo at all
+  "Backpack 30L":                     unsplash("iFelMiWMuO4"), // black leather backpack
+  "Board game: Scrabble":             unsplash("lQrzGg_BiMM"), // scrabble board and tiles
+  "Cast iron frying pan":             unsplash("98i_nodTLhE"), // cast iron skillet
+  "Clean Code":                       unsplash("cx13wNqcqZ0"), // programming books on a desk
+  "Football (size 5)":                unsplash("8-s5QuUBtyM"), // football on the pitch
+  "Introduction to Algorithms":       unsplash("FJ5e_2f96h4"), // stack of technical books
+  "Jigsaw puzzle 1000 pc":            unsplash("V9qc-JVKIBo"), // assembled jigsaw puzzle
+  "Kitenge tote bag":                 unsplash("G5JD3lOPf00"), // printed canvas tote
+  "Leather sandals":                  unsplash("b_k6k7McqcE"), // brown leather sandals
+  "Maasai beaded bracelet":           unsplash("5LMam0Cn88k"), // beaded bracelet
+  "Potted succulent trio":            unsplash("9YpzV6czaAI"), // small potted succulent
+  "Scientific calculator":            unsplash("r_m-JKJVto0"), // Casio calculator
+  "Sisal storage baskets (set of 3)": unsplash("uRCrdEiiVPU"), // woven storage baskets
+  "USB-C hub 7-in-1":                 unsplash("mwuFNpcHskI"), // USB adapter cable
+  "Yoga mat":                         unsplash("rX8gBeg2WM0"), // yoga mat in use
 };
 
 async function ensureUser(p: Person, passwordHash: string): Promise<string> {
