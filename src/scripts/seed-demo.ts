@@ -25,6 +25,20 @@ const LISTINGS: [string, string, number, number, string][] = [ // title, categor
   ["Ceramic planter", "Home & Garden", 16.0, 9, "Glazed, with drainage tray."],
   ["Denim jacket", "Fashion", 39.0, 6, "Medium, light wash."],
 ];
+// ===== PASTE YOUR IMAGE LINKS HERE =====
+// Put each link between the quotes. Links must start with https://
+// Leave "" for any item you don't have a link for yet (it keeps the initials tile).
+const IMAGE_URLS: Record<string, string> = {
+  "Desk lamp":           "https://unsplash.com/photos/SbGLQAtv8Gk/download?force=true&w=800",
+  "Vintage film camera": "https://unsplash.com/photos/NorKSv_Rf4A/download?force=true&w=800",
+  "Used paperback set":  "https://unsplash.com/photos/jcD8lXN27Xs/download?force=true&w=800",
+  "Mechanical keyboard": "https://unsplash.com/photos/yhlM9oUqLdM/download?force=true&w=800",
+  "Wool scarf":          "https://unsplash.com/photos/CNjfgzoY8JU/download?force=true&w=800",
+  "Denim jacket":        "https://unsplash.com/photos/h6ajwqvCKsY/download?force=true&w=800",
+  "Ceramic planter":     "https://unsplash.com/photos/3aVVXqJmgoY/download?force=true&w=800",
+  "Wooden train set":    "https://unsplash.com/photos/uJx4IFjx7U0/download?force=true&w=800",
+};
+// =======================================
 
 async function ensureCategory(c: { name: string; description: string }): Promise<number> {
   const { rows: found } = await pool.query<{ category_id: number }>(
