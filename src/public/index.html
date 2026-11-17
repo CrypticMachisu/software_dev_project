@@ -85,6 +85,10 @@ nav .who{color:var(--mute);font-size:.9rem;padding-left:.35rem}
 nav .quiet{color:var(--mute);font-size:.9rem;display:inline-flex;align-items:center;min-height:44px}
 nav .quiet:hover{color:var(--bad)}
 nav .admin-link{border-color:var(--acc);color:var(--acc)}
+/* The bar wraps on narrow screens; the auto margin keeps the link right-aligned on its own row. */
+nav .staff-link{display:inline-flex;align-items:center;min-height:44px;margin-left:auto;font-size:.9rem;font-weight:600;
+  color:var(--mute);text-decoration:underline;text-underline-offset:3px}
+nav .staff-link:hover,nav .staff-link:focus-visible{color:var(--acc)}
 .site-foot{max-width:1140px;margin:0 auto;padding:1.1rem clamp(1rem,4vw,2rem) 5.5rem;
   display:flex;flex-wrap:wrap;gap:.5rem 1.25rem;justify-content:space-between;align-items:center;
   border-top:1px solid var(--line);color:var(--mute);font-size:.85rem}
@@ -341,7 +345,7 @@ input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="tr
 <nav id="nav"></nav>
 </header>
 <main id="app" tabindex="-1"></main>
-<footer class="site-foot"><span>M-DUKA multi-seller market</span><a href="/admin">Staff sign-in</a></footer>
+<footer class="site-foot"><span>M-DUKA multi-seller market</span></footer>
 
 <script>
 /* ===== Utilities ===== */
@@ -509,7 +513,8 @@ function navbar(){const u=auth.user,n=cart.count();
  <a class="pill" href="#/cart">Cart${n?`<span class="badge">${n}</span>`:""}</a>
  ${u&&(auth.hasRole("admin")||auth.hasRole("super_admin"))?`<a class="pill admin-link" href="/admin">Admin panel</a>`:""}
  ${u?`<details class="account"${matchMedia("(min-width:761px)").matches?" open":""}><summary class="pill">${esc(u.name)}</summary><div class="account-links"><a class="pill" href="#/orders">My orders</a><a class="pill" href="#/seller">${auth.hasRole("seller")?"Sell":"Become a seller"}</a><a class="quiet" href="#" data-act="logout">Log out</a></div></details>`
- :`<span class="who">Browsing as guest</span><a class="pill" href="#/login">Log in</a>`}`}
+ :`<span class="who">Browsing as guest</span><a class="pill" href="#/login">Log in</a>`}
+ <a class="staff-link" href="/admin">Staff sign-in</a>`}
 function loginRedirect(){location.hash="#/login?next="+encodeURIComponent(location.hash||"#/")}
 /** Confirms the cookie still belongs to the account this tab is showing. */
 async function ensureUser(){
